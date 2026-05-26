@@ -64,15 +64,19 @@ export const Route = createFileRoute("/api/transcribe")({
           segments?: Array<{ id?: number; start: number; end: number; text: string }>;
         };
 
-        const segments = (data.segments ?? []).map((s, i) => ({
+        const rawSegments = (data.segments ?? []).map((s, i) => ({
           id: typeof s.id === "number" ? s.id : i,
           start: s.start,
           end: s.end,
-          text: (s.text || "").trim(),
+          text: dedupeRepeats((s.text || "").trim()),
         }));
 
+        // Drop segments that became empty after dedupe.
+        const segments = rawSegments.filter((s) => s.text.length > 0);
+
+        const fullText = dedupeRepeats((data.text || "").trim());
+
         // Forward Groq rate-limit headers so the UI can show "minutes left today".
-        // Groq sends values like "28800" (seconds) and reset like "23h59m59s".
         const h = res.headers;
         const rate = {
           limitAudioSeconds: numOrNull(h.get("x-ratelimit-limit-audio-seconds")),
@@ -82,7 +86,7 @@ export const Route = createFileRoute("/api/transcribe")({
           remainingRequests: numOrNull(h.get("x-ratelimit-remaining-requests")),
         };
 
-        return Response.json({ text: (data.text || "").trim(), segments, rate });
+        return Response.json({ text: fullText, segments, rate });
       },
     },
   },
