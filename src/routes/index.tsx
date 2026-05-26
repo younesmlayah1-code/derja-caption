@@ -22,7 +22,7 @@ const ACCEPTED = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/webm
 const ACCEPTED_EXT = [".mp4", ".mov", ".avi", ".webm", ".mp3", ".wav", ".m4a"];
 const MAX_BYTES = 500 * 1024 * 1024;
 
-type Status = "idle" | "loading-model" | "decoding" | "transcribing" | "done" | "error";
+type Status = "idle" | "uploading" | "transcribing" | "done" | "error";
 
 function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -61,23 +61,12 @@ function Home() {
     if (!file) return;
     setError(null);
     setModelProgress(0);
-    setStatus("loading-model");
-    setModelStatus("Loading Whisper model…");
+    setStatus("uploading");
+    setModelStatus("");
 
     try {
-      const onModel = (p: LoadProgress) => {
-        if (p.status === "progress" && typeof p.progress === "number") {
-          setModelProgress(Math.round(p.progress));
-          setModelStatus(`Downloading model${p.file ? ` · ${p.file.split("/").pop()}` : ""}`);
-        } else if (p.status === "ready" || p.status === "done") {
-          setModelProgress(100);
-        } else if (p.status === "initiate" || p.status === "download") {
-          setModelStatus("Fetching model files…");
-        }
-      };
-
-      const result = await transcribeFile(file, onModel, ({ stage }) => {
-        if (stage === "decoding") setStatus("decoding");
+      const result = await transcribeFile(file, undefined, ({ stage }) => {
+        if (stage === "uploading") setStatus("uploading");
         else setStatus("transcribing");
       });
 
