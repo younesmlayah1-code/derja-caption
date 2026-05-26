@@ -265,14 +265,6 @@ function Home() {
                 >
                   New Video
                 </button>
-              </div>
-                <button
-                  onClick={reset}
-                  className="rounded-xl bg-secondary px-4 py-2 text-sm hover:bg-secondary/80"
-                >
-                  New Video
-                </button>
-              </div>
             </div>
 
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
