@@ -29,20 +29,20 @@ export const Route = createFileRoute("/api/transcribe")({
           );
         }
 
-        // Short, neutral Arabic prompt. Long keyword lists were biasing the
-        // model and causing it to repeat the same words. A minimal hint is
-        // enough to lock the script to Arabic without skewing output.
+        // Derja-biased Arabic prompt: includes common Tunisian dialect words
+        // so Whisper transcribes in Derja (not Fosha/MSA), while staying in
+        // Arabic script. Keep it focused — overly long word lists cause
+        // repetition artifacts (handled separately by dedupeRepeats).
         const derjaPrompt =
-          "تفريغ صوتي باللهجة التونسية بالحروف العربية فقط، مع علامات الترقيم.";
+          "تفريغ صوتي باللهجة التونسية الدارجة بالحروف العربية فقط، مع علامات الترقيم. " +
+          "أمثلة كلمات دارجة: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، باهي، موش، ماكش، توا، يعيشك، زادا، خاطر، نحب، نجم، نمشي، نشوف، نحكي، فما، أما، إيا.";
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
         upstream.append("model", "whisper-large-v3");
         upstream.append("language", "ar");
         upstream.append("response_format", "verbose_json");
-        // Small non-zero temperature lets Whisper's fallback decoder break
-        // out of repetition loops when compression_ratio is too high.
-        upstream.append("temperature", "0.2");
+        upstream.append("temperature", "0");
         upstream.append("prompt", derjaPrompt);
 
         const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
