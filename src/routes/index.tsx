@@ -199,31 +199,41 @@ function Home() {
                   )}
                 </div>
 
-                {status === "uploading" && (
+                {status === "loading-model" && (
                   <div className="mt-5">
                     <div className="mb-2 flex justify-between text-xs text-muted-foreground">
-                      <span>Uploading…</span>
-                      <span>{progress}%</span>
+                      <span>{modelStatus || "Loading model…"}</span>
+                      <span>{modelProgress}%</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
                       <div
                         className="h-full transition-all"
-                        style={{ width: `${progress}%`, background: "var(--gradient-primary)" }}
+                        style={{ width: `${modelProgress}%`, background: "var(--gradient-primary)" }}
                       />
                     </div>
+                    <p className="mt-2 text-xs text-muted-foreground/70">
+                      First run downloads ~250MB. Cached afterwards.
+                    </p>
+                  </div>
+                )}
+
+                {status === "decoding" && (
+                  <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Extracting audio…
                   </div>
                 )}
 
                 {status === "transcribing" && (
                   <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Transcribing Derja audio…
+                    Transcribing Derja audio locally…
                   </div>
                 )}
 
                 {status === "idle" && (
                   <button
-                    onClick={upload}
+                    onClick={run}
                     className="mt-5 w-full rounded-xl py-3 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.01] active:scale-[0.99]"
                     style={{ background: "var(--gradient-primary)", boxShadow: "var(--shadow-glow)" }}
                   >
