@@ -107,6 +107,85 @@ function numOrNull(v: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+type PolishSeg = { id: number; start: number; end: number; text: string };
+
+// Use Lovable AI to fix spelling, spacing and punctuation in Derja segments
+// while preserving the original wording and meaning. Returns same shape with
+// cleaned text. Throws on hard failure; caller falls back to raw segments.
+async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
+  if (segments.length === 0) return segments;
+  const key = process.env.LOVABLE_API_KEY;
+  if (!key) return segments;
+
+  const payload = segments.map((s) => ({ id: s.id, text: s.text }));
+
+  const system =
+    "أنت محرر لغوي للهجة التونسية الدارجة. مهمتك تنظيف نص تفريغ صوتي: " +
+    "صحح الإملاء، أضف علامات الترقيم المناسبة (،.؟!)، أصلح المسافات، " +
+    "وأزل الكلمات المكررة بشكل خاطئ. " +
+    "حافظ بدقة على نفس الكلمات والمعنى واللهجة التونسية. لا تترجم للفصحى. " +
+    "لا تضف ولا تحذف معلومات. أرجع JSON فقط بنفس البنية: " +
+    '[{"id":number,"text":string}, ...]';
+
+  const userMsg = JSON.stringify(payload);
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Lovable-API-Key": key,
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userMsg },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Lovable AI polish failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
+  }
+
+  const j = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = j.choices?.[0]?.message?.content?.trim() ?? "";
+  if (!content) return segments;
+
+  // Model may return either a bare array or an object wrapping it.
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    const m = content.match(/\[[\s\S]*\]/);
+    if (!m) return segments;
+    parsed = JSON.parse(m[0]);
+  }
+
+  const arr: Array<{ id?: number; text?: string }> = Array.isArray(parsed)
+    ? (parsed as Array<{ id?: number; text?: string }>)
+    : Array.isArray((parsed as { segments?: unknown }).segments)
+      ? ((parsed as { segments: Array<{ id?: number; text?: string }> }).segments)
+      : [];
+
+  if (arr.length === 0) return segments;
+
+  const byId = new Map<number, string>();
+  for (const item of arr) {
+    if (typeof item?.id === "number" && typeof item?.text === "string") {
+      byId.set(item.id, item.text.trim());
+    }
+  }
+
+  return segments.map((s) => {
+    const cleaned = byId.get(s.id);
+    return cleaned && cleaned.length > 0 ? { ...s, text: cleaned } : s;
+  });
+}
+
 // Collapse only obvious Whisper hallucination loops. We DO NOT touch a single
 // repeat (e.g. "لا لا", "شوية شوية") because those are valid speech. We only
 // act when something repeats 3+ times in a row — that's the real artifact.
