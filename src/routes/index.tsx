@@ -260,17 +260,12 @@ function Home() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={cleanup}
-                  disabled={busy}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary/15 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/25 disabled:opacity-50"
+                  onClick={reset}
+                  className="rounded-xl bg-secondary px-4 py-2 text-sm hover:bg-secondary/80"
                 >
-                  {status === "cleaning" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4" />
-                  )}
-                  Improve Transcript
+                  New Video
                 </button>
+              </div>
                 <button
                   onClick={reset}
                   className="rounded-xl bg-secondary px-4 py-2 text-sm hover:bg-secondary/80"
