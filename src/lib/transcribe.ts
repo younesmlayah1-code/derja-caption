@@ -4,7 +4,7 @@ import type { Segment } from "./subtitles";
 // Use the Hugging Face CDN for model files (no local model hosting needed).
 env.allowLocalModels = false;
 
-const MODEL_ID = "Xenova/whisper-small";
+const MODEL_ID = "Xenova/whisper-tiny";
 
 let asrPromise: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
 
@@ -19,11 +19,8 @@ export type LoadProgress = {
 export function getModel(onProgress?: (p: LoadProgress) => void) {
   if (!asrPromise) {
     asrPromise = pipeline("automatic-speech-recognition", MODEL_ID, {
-      // Quantized decoder embeddings are broken in current ORT — use fp32 weights everywhere.
-      dtype: {
-        encoder_model: "fp32",
-        decoder_model_merged: "fp32",
-      },
+      // whisper-tiny is small enough that fp32 is fast and avoids ORT quantization bugs.
+      dtype: "fp32",
       device: "wasm",
       progress_callback: onProgress as never,
     } as never) as Promise<AutomaticSpeechRecognitionPipeline>;
