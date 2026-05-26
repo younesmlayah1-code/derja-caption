@@ -55,14 +55,22 @@ function Home() {
     setStatus("idle");
   };
 
+  const [progressLabel, setProgressLabel] = useState<string>("");
+
   const run = useCallback(async () => {
     if (!file) return;
     setError(null);
     setStatus("extracting");
+    setProgressLabel("");
 
     try {
-      const result = await transcribeFile(file, undefined, ({ stage }) => {
+      const result = await transcribeFile(file, undefined, ({ stage, chunkIndex, chunkCount }) => {
         setStatus(stage);
+        if (chunkCount && chunkCount > 1 && chunkIndex) {
+          setProgressLabel(` (part ${chunkIndex}/${chunkCount})`);
+        } else {
+          setProgressLabel("");
+        }
       });
 
       setTranscript(result.text);
@@ -192,14 +200,14 @@ function Home() {
                 {status === "uploading" && (
                   <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Uploading audio…
+                    Uploading audio{progressLabel}…
                   </div>
                 )}
 
                 {status === "transcribing" && (
                   <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Transcribing Derja audio…
+                    Transcribing Derja audio{progressLabel}…
                   </div>
                 )}
 

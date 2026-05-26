@@ -21,29 +21,31 @@ export const Route = createFileRoute("/api/transcribe")({
           return Response.json({ error: "Missing 'file' upload." }, { status: 400 });
         }
 
-        // Groq free tier limit is 25MB per file.
         const MAX = 25 * 1024 * 1024;
         if (file.size > MAX) {
           return Response.json(
-            { error: `File is ${(file.size / 1024 / 1024).toFixed(1)}MB. Groq Whisper accepts up to 25MB. Please trim or compress the audio.` },
+            { error: `File chunk is ${(file.size / 1024 / 1024).toFixed(1)}MB. Limit is 25MB.` },
             { status: 413 },
           );
         }
 
-        // A Derja-focused prompt biases Whisper toward Tunisian Arabic spelling,
-        // common words, and code-switching with French — this dramatically reduces
-        // grammar mistakes vs. the default Modern Standard Arabic decoding.
+        // Derja-biasing prompt + optional running context from previous chunk
+        // to keep vocabulary and spelling consistent across long videos.
+        const context = (incoming.get("context") as string | null) || "";
         const derjaPrompt =
-          "نقل صوتي باللهجة التونسية الدارجة. كلمات شائعة: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، نحب، نجم، باهي، نرمال، فما، موش، ماكش، تو، توا، يعيشك، صحة، ربي، إنشاء الله، يزي، أهلا، مرحبا. قد تتضمن كلمات فرنسية مثل: normal, voilà, donc, parce que, déjà, bon, bref.";
+          "نقل صوتي دقيق باللهجة التونسية الدارجة مع علامات الترقيم. " +
+          "كلمات شائعة: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، نحب، نجم، باهي، نرمال، فما، موش، ماكش، تو، توا، يعيشك، صحة، ربي، إنشاء الله، يزي، أهلا، مرحبا، زادا، كان، إيا، أما، خاطر، حتى، عندي، عندك، نعمل، نمشي، نجي، شفت، قلت، قال، قالت. " +
+          "قد تتضمن كلمات فرنسية مثل: normal, voilà, donc, parce que, déjà, bon, bref, ok, merci, salut.";
+        const fullPrompt = context ? `${derjaPrompt}\n\nسياق سابق: ${context}` : derjaPrompt;
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
+        // whisper-large-v3 = highest accuracy Groq offers for Arabic dialects.
         upstream.append("model", "whisper-large-v3");
         upstream.append("language", "ar");
         upstream.append("response_format", "verbose_json");
         upstream.append("temperature", "0");
-        upstream.append("prompt", derjaPrompt);
-
+        upstream.append("prompt", fullPrompt);
 
         const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
           method: "POST",
