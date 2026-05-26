@@ -265,6 +265,7 @@ function Home() {
                 >
                   New Video
                 </button>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
