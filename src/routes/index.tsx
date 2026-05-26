@@ -91,7 +91,7 @@ function Home() {
   const exportVtt = () =>
     downloadFile(`${base}.vtt`, toVtt(segments), "text/vtt;charset=utf-8");
 
-  const busy = status === "uploading" || status === "transcribing";
+  const busy = status === "extracting" || status === "uploading" || status === "transcribing";
 
   return (
     <main className="min-h-screen w-full px-4 py-10 md:py-16">
