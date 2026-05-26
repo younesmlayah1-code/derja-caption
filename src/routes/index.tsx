@@ -182,6 +182,13 @@ function Home() {
                   )}
                 </div>
 
+                {status === "extracting" && (
+                  <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Extracting audio from video…
+                  </div>
+                )}
+
                 {status === "uploading" && (
                   <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -195,6 +202,7 @@ function Home() {
                     Transcribing Derja audio…
                   </div>
                 )}
+
 
                 {status === "idle" && (
                   <button
