@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
-import { Upload, FileVideo, Loader2, Sparkles, Download, X, Languages } from "lucide-react";
+import { Upload, FileVideo, Loader2, Download, X, Languages } from "lucide-react";
 import { toSrt, toVtt, fmtTime, downloadFile, type Segment } from "@/lib/subtitles";
+import { transcribeFile, type LoadProgress } from "@/lib/transcribe";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -10,24 +11,24 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Upload a video and instantly extract Tunisian Arabic (Derja) subtitles with AI. Export to TXT, SRT, or VTT.",
+          "Upload a video and instantly extract Tunisian Arabic (Derja) subtitles, fully in your browser. Export to TXT, SRT, or VTT.",
       },
     ],
   }),
   component: Home,
 });
 
-const ACCEPTED = ["video/mp4", "video/quicktime", "video/x-msvideo"];
-const ACCEPTED_EXT = [".mp4", ".mov", ".avi"];
+const ACCEPTED = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/webm", "audio/mpeg", "audio/wav", "audio/mp4"];
+const ACCEPTED_EXT = [".mp4", ".mov", ".avi", ".webm", ".mp3", ".wav", ".m4a"];
 const MAX_BYTES = 500 * 1024 * 1024;
-const API_MAX = 25 * 1024 * 1024;
 
-type Status = "idle" | "uploading" | "transcribing" | "cleaning" | "done" | "error";
+type Status = "idle" | "loading-model" | "decoding" | "transcribing" | "done" | "error";
 
 function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>("idle");
-  const [progress, setProgress] = useState(0);
+  const [modelProgress, setModelProgress] = useState(0);
+  const [modelStatus, setModelStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>("");
   const [segments, setSegments] = useState<Segment[]>([]);
@@ -37,7 +38,7 @@ function Home() {
   const validate = (f: File): string | null => {
     const ext = "." + f.name.split(".").pop()?.toLowerCase();
     if (!ACCEPTED.includes(f.type) && !ACCEPTED_EXT.includes(ext)) {
-      return "Unsupported file type. Use MP4, MOV, or AVI.";
+      return "Unsupported file type. Use MP4, MOV, WEBM, MP3, WAV or M4A.";
     }
     if (f.size > MAX_BYTES) return "File exceeds 500MB limit.";
     return null;
@@ -56,80 +57,46 @@ function Home() {
     setStatus("idle");
   };
 
-  const upload = useCallback(() => {
+  const run = useCallback(async () => {
     if (!file) return;
     setError(null);
-    setProgress(0);
-    setStatus("uploading");
+    setModelProgress(0);
+    setStatus("loading-model");
+    setModelStatus("Loading Whisper model…");
 
-    if (file.size > API_MAX) {
-      setError(
-        `File is ${(file.size / 1024 / 1024).toFixed(1)}MB. OpenAI's transcription API accepts up to 25MB. Please compress or trim the video.`,
-      );
-      setStatus("error");
-      return;
-    }
-
-    const fd = new FormData();
-    fd.append("file", file);
-
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/transcribe");
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        setProgress(Math.round((e.loaded / e.total) * 100));
-        if (e.loaded === e.total) setStatus("transcribing");
-      }
-    };
-    xhr.onload = () => {
-      try {
-        const data = JSON.parse(xhr.responseText);
-        if (xhr.status >= 200 && xhr.status < 300) {
-          setTranscript(data.text || "");
-          setSegments(data.segments || []);
-          setStatus("done");
-        } else {
-          setError(data.error || "Transcription failed.");
-          setStatus("error");
-        }
-      } catch {
-        setError("Unexpected server response.");
-        setStatus("error");
-      }
-    };
-    xhr.onerror = () => {
-      setError("Upload failed. Check your connection.");
-      setStatus("error");
-    };
-    xhr.send(fd);
-  }, [file]);
-
-  const cleanup = async () => {
-    if (!transcript) return;
-    setStatus("cleaning");
-    setError(null);
     try {
-      const res = await fetch("/api/cleanup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: transcript }),
+      const onModel = (p: LoadProgress) => {
+        if (p.status === "progress" && typeof p.progress === "number") {
+          setModelProgress(Math.round(p.progress));
+          setModelStatus(`Downloading model${p.file ? ` · ${p.file.split("/").pop()}` : ""}`);
+        } else if (p.status === "ready" || p.status === "done") {
+          setModelProgress(100);
+        } else if (p.status === "initiate" || p.status === "download") {
+          setModelStatus("Fetching model files…");
+        }
+      };
+
+      const result = await transcribeFile(file, onModel, ({ stage }) => {
+        if (stage === "decoding") setStatus("decoding");
+        else setStatus("transcribing");
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Cleanup failed");
-      setTranscript(data.text);
+
+      setTranscript(result.text);
+      setSegments(result.segments);
       setStatus("done");
     } catch (e) {
-      setError((e as Error).message);
-      setStatus("done");
+      console.error(e);
+      setError((e as Error).message || "Transcription failed.");
+      setStatus("error");
     }
-  };
+  }, [file]);
 
   const reset = () => {
     setFile(null);
     setTranscript("");
     setSegments([]);
     setStatus("idle");
-    setProgress(0);
+    setModelProgress(0);
     setError(null);
   };
 
@@ -141,7 +108,7 @@ function Home() {
   const exportVtt = () =>
     downloadFile(`${base}.vtt`, toVtt(segments), "text/vtt;charset=utf-8");
 
-  const busy = status === "uploading" || status === "transcribing" || status === "cleaning";
+  const busy = status === "loading-model" || status === "decoding" || status === "transcribing";
 
   return (
     <main className="min-h-screen w-full px-4 py-10 md:py-16">
