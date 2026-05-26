@@ -22,7 +22,7 @@ const ACCEPTED = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/webm
 const ACCEPTED_EXT = [".mp4", ".mov", ".avi", ".webm", ".mp3", ".wav", ".m4a"];
 const MAX_BYTES = 500 * 1024 * 1024;
 
-type Status = "idle" | "uploading" | "transcribing" | "done" | "error";
+type Status = "idle" | "extracting" | "uploading" | "transcribing" | "done" | "error";
 
 function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -58,12 +58,11 @@ function Home() {
   const run = useCallback(async () => {
     if (!file) return;
     setError(null);
-    setStatus("uploading");
+    setStatus("extracting");
 
     try {
       const result = await transcribeFile(file, undefined, ({ stage }) => {
-        if (stage === "uploading") setStatus("uploading");
-        else setStatus("transcribing");
+        setStatus(stage);
       });
 
       setTranscript(result.text);
@@ -92,7 +91,7 @@ function Home() {
   const exportVtt = () =>
     downloadFile(`${base}.vtt`, toVtt(segments), "text/vtt;charset=utf-8");
 
-  const busy = status === "uploading" || status === "transcribing";
+  const busy = status === "extracting" || status === "uploading" || status === "transcribing";
 
   return (
     <main className="min-h-screen w-full px-4 py-10 md:py-16">
@@ -183,6 +182,13 @@ function Home() {
                   )}
                 </div>
 
+                {status === "extracting" && (
+                  <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Extracting audio from video…
+                  </div>
+                )}
+
                 {status === "uploading" && (
                   <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -196,6 +202,7 @@ function Home() {
                     Transcribing Derja audio…
                   </div>
                 )}
+
 
                 {status === "idle" && (
                   <button
