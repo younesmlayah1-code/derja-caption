@@ -29,22 +29,20 @@ export const Route = createFileRoute("/api/transcribe")({
           );
         }
 
-        // Pure-Arabic Derja prompt. We intentionally do NOT include English
-        // or French words here — listing them was causing Whisper to switch
-        // languages and emit Latin-script text in the middle of Arabic
-        // transcripts. Keeping the prompt 100% Arabic locks the model to
-        // Arabic script output.
+        // Short, neutral Arabic prompt. Long keyword lists were biasing the
+        // model and causing it to repeat the same words. A minimal hint is
+        // enough to lock the script to Arabic without skewing output.
         const derjaPrompt =
-          "النص التالي مكتوب باللهجة التونسية الدارجة فقط، بالحروف العربية، مع علامات الترقيم الصحيحة. " +
-          "كلمات شائعة في الدارجة التونسية: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، نحب، نجم، باهي، نرمال، فما، موش، ماكش، تو، توا، يعيشك، صحة، ربي، إن شاء الله، يزي، أهلا، مرحبا، زادا، كان، إيا، أما، خاطر، حتى، عندي، عندك، نعمل، نمشي، نجي، شفت، قلت، قال، قالت، نقعد، نخدم، نشوف، نسمع، نقرا، نكتب، نتفرج، نضحك، نحكي. " +
-          "اكتب كل شيء بالعربية فقط، ولا تستعمل الحروف اللاتينية أبدا.";
+          "تفريغ صوتي باللهجة التونسية بالحروف العربية فقط، مع علامات الترقيم.";
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
         upstream.append("model", "whisper-large-v3");
         upstream.append("language", "ar");
         upstream.append("response_format", "verbose_json");
-        upstream.append("temperature", "0");
+        // Small non-zero temperature lets Whisper's fallback decoder break
+        // out of repetition loops when compression_ratio is too high.
+        upstream.append("temperature", "0.2");
         upstream.append("prompt", derjaPrompt);
 
         const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
