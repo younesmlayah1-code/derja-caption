@@ -98,33 +98,41 @@ function numOrNull(v: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-// Collapse Whisper repetition artifacts:
-//  - identical consecutive words ("نعم نعم نعم" -> "نعم")
-//  - identical consecutive short phrases (up to 5 words)
-//  - long runs of the same character ("اااااا" -> "اا")
+// Collapse only obvious Whisper hallucination loops. We DO NOT touch a single
+// repeat (e.g. "لا لا", "شوية شوية") because those are valid speech. We only
+// act when something repeats 3+ times in a row — that's the real artifact.
 function dedupeRepeats(input: string): string {
   if (!input) return input;
-  let s = input.replace(/(.)\1{4,}/g, "$1$1");
+  // Collapse runs of the same character (6+) down to 2: "اااااااا" -> "اا".
+  let s = input.replace(/(.)\1{5,}/g, "$1$1");
 
-  const tokens = s.split(/(\s+)/); // keep whitespace
-  const words = tokens.filter((t) => t.trim().length > 0);
-  if (words.length < 2) return s.trim();
+  const words = s.split(/\s+/).filter(Boolean);
+  if (words.length < 3) return s.trim();
 
-  // Remove consecutive duplicate words
+  // Collapse a word repeated 3+ times in a row down to a single instance.
   const out: string[] = [];
-  for (const w of words) {
-    if (out.length && out[out.length - 1] === w) continue;
-    out.push(w);
+  let run = 1;
+  for (let i = 0; i < words.length; i++) {
+    if (i > 0 && words[i] === words[i - 1]) {
+      run++;
+      if (run >= 3) continue; // skip 3rd+ repetition
+      out.push(words[i]);
+    } else {
+      run = 1;
+      out.push(words[i]);
+    }
   }
 
-  // Remove consecutive duplicate n-grams (n=2..5)
-  for (let n = 5; n >= 2; n--) {
+  // Collapse n-gram phrases repeated 3+ times (n=2..5).
+  for (let n = 2; n <= 5; n++) {
     let i = 0;
-    while (i + 2 * n <= out.length) {
+    while (i + 3 * n <= out.length) {
       const a = out.slice(i, i + n).join(" ");
       const b = out.slice(i + n, i + 2 * n).join(" ");
-      if (a === b) {
-        out.splice(i + n, n);
+      const c = out.slice(i + 2 * n, i + 3 * n).join(" ");
+      if (a === b && b === c) {
+        // Drop the 3rd copy, keep checking from same position for more.
+        out.splice(i + 2 * n, n);
       } else {
         i++;
       }
