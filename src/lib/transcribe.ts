@@ -50,7 +50,7 @@ export async function transcribeFile(
     const data = (await res.json()) as { text: string; segments: Segment[] };
     const text = (data.text || "").trim();
     if (text) textParts.push(text);
-    priorText = text;
+    
 
     for (const s of data.segments || []) {
       allSegments.push({
