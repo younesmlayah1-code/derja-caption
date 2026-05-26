@@ -58,9 +58,7 @@ function Home() {
   const run = useCallback(async () => {
     if (!file) return;
     setError(null);
-    setModelProgress(0);
     setStatus("uploading");
-    setModelStatus("");
 
     try {
       const result = await transcribeFile(file, undefined, ({ stage }) => {
@@ -83,7 +81,6 @@ function Home() {
     setTranscript("");
     setSegments([]);
     setStatus("idle");
-    setModelProgress(0);
     setError(null);
   };
 
