@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
-import { Upload, FileVideo, Loader2, Download, X, Languages } from "lucide-react";
+import { Upload, FileVideo, Loader2, Download, X, Languages, Clock } from "lucide-react";
 import { toSrt, toVtt, fmtTime, downloadFile, type Segment } from "@/lib/subtitles";
-import { transcribeFile } from "@/lib/transcribe";
+import { transcribeFile, type RateInfo } from "@/lib/transcribe";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -56,6 +56,7 @@ function Home() {
   };
 
   const [progressLabel, setProgressLabel] = useState<string>("");
+  const [rate, setRate] = useState<RateInfo | null>(null);
 
   const run = useCallback(async () => {
     if (!file) return;
@@ -75,6 +76,7 @@ function Home() {
 
       setTranscript(result.text);
       setSegments(result.segments);
+      if (result.rate) setRate(result.rate);
       setStatus("done");
     } catch (e) {
       console.error(e);
@@ -118,6 +120,22 @@ function Home() {
             Upload a video and get accurate Tunisian Arabic subtitles with timestamps in seconds.
           </p>
         </header>
+
+        {rate && rate.remainingAudioSeconds != null && (
+          <div className="mx-auto mb-6 flex max-w-sm items-center justify-center gap-2 rounded-full border border-border bg-card/40 px-4 py-2 text-xs text-muted-foreground backdrop-blur">
+            <Clock className="h-3.5 w-3.5 text-primary" />
+            <span>
+              <span className="font-medium text-foreground">
+                {Math.max(0, Math.floor(rate.remainingAudioSeconds / 60))} min
+              </span>
+              {rate.limitAudioSeconds != null && (
+                <> / {Math.floor(rate.limitAudioSeconds / 60)} min</>
+              )}{" "}
+              left today
+              {rate.resetAudioSeconds ? ` · resets in ${rate.resetAudioSeconds}` : ""}
+            </span>
+          </div>
+        )}
 
         {!segments.length && (
           <section

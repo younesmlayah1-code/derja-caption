@@ -73,8 +73,25 @@ export const Route = createFileRoute("/api/transcribe")({
           text: (s.text || "").trim(),
         }));
 
-        return Response.json({ text: (data.text || "").trim(), segments });
+        // Forward Groq rate-limit headers so the UI can show "minutes left today".
+        // Groq sends values like "28800" (seconds) and reset like "23h59m59s".
+        const h = res.headers;
+        const rate = {
+          limitAudioSeconds: numOrNull(h.get("x-ratelimit-limit-audio-seconds")),
+          remainingAudioSeconds: numOrNull(h.get("x-ratelimit-remaining-audio-seconds")),
+          resetAudioSeconds: h.get("x-ratelimit-reset-audio-seconds"),
+          limitRequests: numOrNull(h.get("x-ratelimit-limit-requests")),
+          remainingRequests: numOrNull(h.get("x-ratelimit-remaining-requests")),
+        };
+
+        return Response.json({ text: (data.text || "").trim(), segments, rate });
       },
     },
   },
 });
+
+function numOrNull(v: string | null): number | null {
+  if (v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}

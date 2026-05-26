@@ -14,17 +14,26 @@ export type TranscribeProgress = (info: {
   chunkCount?: number;
 }) => void;
 
+export type RateInfo = {
+  limitAudioSeconds: number | null;
+  remainingAudioSeconds: number | null;
+  resetAudioSeconds: string | null;
+  limitRequests: number | null;
+  remainingRequests: number | null;
+};
+
 export async function transcribeFile(
   file: File,
   _onModelProgress?: (p: LoadProgress) => void,
   onProgress?: TranscribeProgress,
-): Promise<{ text: string; segments: Segment[] }> {
+): Promise<{ text: string; segments: Segment[]; rate: RateInfo | null }> {
   onProgress?.({ stage: "extracting" });
   const chunks = await extractMonoWavChunks(file);
 
   const allSegments: Segment[] = [];
   const textParts: string[] = [];
   let segId = 0;
+  let lastRate: RateInfo | null = null;
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
@@ -47,10 +56,10 @@ export async function transcribeFile(
       throw new Error(msg);
     }
 
-    const data = (await res.json()) as { text: string; segments: Segment[] };
+    const data = (await res.json()) as { text: string; segments: Segment[]; rate?: RateInfo };
     const text = (data.text || "").trim();
     if (text) textParts.push(text);
-    
+    if (data.rate) lastRate = data.rate;
 
     for (const s of data.segments || []) {
       allSegments.push({
@@ -62,5 +71,5 @@ export async function transcribeFile(
     }
   }
 
-  return { text: textParts.join(" "), segments: allSegments };
+  return { text: textParts.join(" "), segments: allSegments, rate: lastRate };
 }
