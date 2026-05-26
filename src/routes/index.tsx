@@ -97,7 +97,7 @@ function Home() {
   const exportVtt = () =>
     downloadFile(`${base}.vtt`, toVtt(segments), "text/vtt;charset=utf-8");
 
-  const busy = status === "loading-model" || status === "decoding" || status === "transcribing";
+  const busy = status === "uploading" || status === "transcribing";
 
   return (
     <main className="min-h-screen w-full px-4 py-10 md:py-16">
@@ -188,35 +188,17 @@ function Home() {
                   )}
                 </div>
 
-                {status === "loading-model" && (
-                  <div className="mt-5">
-                    <div className="mb-2 flex justify-between text-xs text-muted-foreground">
-                      <span>{modelStatus || "Loading model…"}</span>
-                      <span>{modelProgress}%</span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-                      <div
-                        className="h-full transition-all"
-                        style={{ width: `${modelProgress}%`, background: "var(--gradient-primary)" }}
-                      />
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground/70">
-                      First run downloads ~40MB. Cached afterwards.
-                    </p>
-                  </div>
-                )}
-
-                {status === "decoding" && (
+                {status === "uploading" && (
                   <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Extracting audio…
+                    Uploading audio…
                   </div>
                 )}
 
                 {status === "transcribing" && (
                   <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Transcribing Derja audio locally…
+                    Transcribing Derja audio…
                   </div>
                 )}
 
