@@ -30,12 +30,20 @@ export const Route = createFileRoute("/api/transcribe")({
           );
         }
 
+        // A Derja-focused prompt biases Whisper toward Tunisian Arabic spelling,
+        // common words, and code-switching with French — this dramatically reduces
+        // grammar mistakes vs. the default Modern Standard Arabic decoding.
+        const derjaPrompt =
+          "نقل صوتي باللهجة التونسية الدارجة. كلمات شائعة: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، نحب، نجم، باهي، نرمال، فما، موش، ماكش، تو، توا، يعيشك، صحة، ربي، إنشاء الله، يزي، أهلا، مرحبا. قد تتضمن كلمات فرنسية مثل: normal, voilà, donc, parce que, déjà, bon, bref.";
+
         const upstream = new FormData();
-        upstream.append("file", file, file.name || "audio");
+        upstream.append("file", file, file.name || "audio.wav");
         upstream.append("model", "whisper-large-v3");
         upstream.append("language", "ar");
         upstream.append("response_format", "verbose_json");
         upstream.append("temperature", "0");
+        upstream.append("prompt", derjaPrompt);
+
 
         const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
           method: "POST",

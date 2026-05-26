@@ -22,7 +22,7 @@ const ACCEPTED = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/webm
 const ACCEPTED_EXT = [".mp4", ".mov", ".avi", ".webm", ".mp3", ".wav", ".m4a"];
 const MAX_BYTES = 500 * 1024 * 1024;
 
-type Status = "idle" | "uploading" | "transcribing" | "done" | "error";
+type Status = "idle" | "extracting" | "uploading" | "transcribing" | "done" | "error";
 
 function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -58,12 +58,11 @@ function Home() {
   const run = useCallback(async () => {
     if (!file) return;
     setError(null);
-    setStatus("uploading");
+    setStatus("extracting");
 
     try {
       const result = await transcribeFile(file, undefined, ({ stage }) => {
-        if (stage === "uploading") setStatus("uploading");
-        else setStatus("transcribing");
+        setStatus(stage);
       });
 
       setTranscript(result.text);
