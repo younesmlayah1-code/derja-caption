@@ -97,3 +97,39 @@ function numOrNull(v: string | null): number | null {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
+
+// Collapse Whisper repetition artifacts:
+//  - identical consecutive words ("نعم نعم نعم" -> "نعم")
+//  - identical consecutive short phrases (up to 5 words)
+//  - long runs of the same character ("اااااا" -> "اا")
+function dedupeRepeats(input: string): string {
+  if (!input) return input;
+  let s = input.replace(/(.)\1{4,}/g, "$1$1");
+
+  const tokens = s.split(/(\s+)/); // keep whitespace
+  const words = tokens.filter((t) => t.trim().length > 0);
+  if (words.length < 2) return s.trim();
+
+  // Remove consecutive duplicate words
+  const out: string[] = [];
+  for (const w of words) {
+    if (out.length && out[out.length - 1] === w) continue;
+    out.push(w);
+  }
+
+  // Remove consecutive duplicate n-grams (n=2..5)
+  for (let n = 5; n >= 2; n--) {
+    let i = 0;
+    while (i + 2 * n <= out.length) {
+      const a = out.slice(i, i + n).join(" ");
+      const b = out.slice(i + n, i + 2 * n).join(" ");
+      if (a === b) {
+        out.splice(i + n, n);
+      } else {
+        i++;
+      }
+    }
+  }
+
+  return out.join(" ").replace(/\s+([،.؟!,?.])/g, "$1").trim();
+}
