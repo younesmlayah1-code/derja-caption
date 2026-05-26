@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
 import { Upload, FileVideo, Loader2, Download, X, Languages } from "lucide-react";
 import { toSrt, toVtt, fmtTime, downloadFile, type Segment } from "@/lib/subtitles";
-import { transcribeFile, type LoadProgress } from "@/lib/transcribe";
+import { transcribeFile } from "@/lib/transcribe";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,13 +22,11 @@ const ACCEPTED = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/webm
 const ACCEPTED_EXT = [".mp4", ".mov", ".avi", ".webm", ".mp3", ".wav", ".m4a"];
 const MAX_BYTES = 500 * 1024 * 1024;
 
-type Status = "idle" | "loading-model" | "decoding" | "transcribing" | "done" | "error";
+type Status = "idle" | "uploading" | "transcribing" | "done" | "error";
 
 function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>("idle");
-  const [modelProgress, setModelProgress] = useState(0);
-  const [modelStatus, setModelStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>("");
   const [segments, setSegments] = useState<Segment[]>([]);
@@ -60,24 +58,11 @@ function Home() {
   const run = useCallback(async () => {
     if (!file) return;
     setError(null);
-    setModelProgress(0);
-    setStatus("loading-model");
-    setModelStatus("Loading Whisper model…");
+    setStatus("uploading");
 
     try {
-      const onModel = (p: LoadProgress) => {
-        if (p.status === "progress" && typeof p.progress === "number") {
-          setModelProgress(Math.round(p.progress));
-          setModelStatus(`Downloading model${p.file ? ` · ${p.file.split("/").pop()}` : ""}`);
-        } else if (p.status === "ready" || p.status === "done") {
-          setModelProgress(100);
-        } else if (p.status === "initiate" || p.status === "download") {
-          setModelStatus("Fetching model files…");
-        }
-      };
-
-      const result = await transcribeFile(file, onModel, ({ stage }) => {
-        if (stage === "decoding") setStatus("decoding");
+      const result = await transcribeFile(file, undefined, ({ stage }) => {
+        if (stage === "uploading") setStatus("uploading");
         else setStatus("transcribing");
       });
 
@@ -96,7 +81,6 @@ function Home() {
     setTranscript("");
     setSegments([]);
     setStatus("idle");
-    setModelProgress(0);
     setError(null);
   };
 
@@ -108,7 +92,7 @@ function Home() {
   const exportVtt = () =>
     downloadFile(`${base}.vtt`, toVtt(segments), "text/vtt;charset=utf-8");
 
-  const busy = status === "loading-model" || status === "decoding" || status === "transcribing";
+  const busy = status === "uploading" || status === "transcribing";
 
   return (
     <main className="min-h-screen w-full px-4 py-10 md:py-16">
@@ -199,35 +183,17 @@ function Home() {
                   )}
                 </div>
 
-                {status === "loading-model" && (
-                  <div className="mt-5">
-                    <div className="mb-2 flex justify-between text-xs text-muted-foreground">
-                      <span>{modelStatus || "Loading model…"}</span>
-                      <span>{modelProgress}%</span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-                      <div
-                        className="h-full transition-all"
-                        style={{ width: `${modelProgress}%`, background: "var(--gradient-primary)" }}
-                      />
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground/70">
-                      First run downloads ~40MB. Cached afterwards.
-                    </p>
-                  </div>
-                )}
-
-                {status === "decoding" && (
+                {status === "uploading" && (
                   <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Extracting audio…
+                    Uploading audio…
                   </div>
                 )}
 
                 {status === "transcribing" && (
                   <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Transcribing Derja audio locally…
+                    Transcribing Derja audio…
                   </div>
                 )}
 
