@@ -4,7 +4,7 @@ import type { Segment } from "./subtitles";
 // Use the Hugging Face CDN for model files (no local model hosting needed).
 env.allowLocalModels = false;
 
-const MODEL_ID = "onnx-community/whisper-small";
+const MODEL_ID = "Xenova/whisper-small";
 
 let asrPromise: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
 
@@ -19,10 +19,14 @@ export type LoadProgress = {
 export function getModel(onProgress?: (p: LoadProgress) => void) {
   if (!asrPromise) {
     asrPromise = pipeline("automatic-speech-recognition", MODEL_ID, {
-      dtype: "q8",
-      device: "webgpu" in navigator ? "webgpu" : "wasm",
+      // q8 on the decoder embeddings breaks ORT on some builds; use fp32 encoder + q8 decoder.
+      dtype: {
+        encoder_model: "fp32",
+        decoder_model_merged: "q8",
+      },
+      device: "wasm",
       progress_callback: onProgress as never,
-    }) as Promise<AutomaticSpeechRecognitionPipeline>;
+    } as never) as Promise<AutomaticSpeechRecognitionPipeline>;
   }
   return asrPromise;
 }
