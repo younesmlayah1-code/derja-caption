@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
-import { Upload, FileVideo, Loader2, Download, X, Languages } from "lucide-react";
+import { Upload, FileVideo, Loader2, Download, X, Languages, Clock } from "lucide-react";
 import { toSrt, toVtt, fmtTime, downloadFile, type Segment } from "@/lib/subtitles";
-import { transcribeFile } from "@/lib/transcribe";
+import { transcribeFile, type RateInfo } from "@/lib/transcribe";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -56,6 +56,7 @@ function Home() {
   };
 
   const [progressLabel, setProgressLabel] = useState<string>("");
+  const [rate, setRate] = useState<RateInfo | null>(null);
 
   const run = useCallback(async () => {
     if (!file) return;
@@ -75,6 +76,7 @@ function Home() {
 
       setTranscript(result.text);
       setSegments(result.segments);
+      if (result.rate) setRate(result.rate);
       setStatus("done");
     } catch (e) {
       console.error(e);
