@@ -29,22 +29,20 @@ export const Route = createFileRoute("/api/transcribe")({
           );
         }
 
-        // Pure-Arabic Derja prompt. We intentionally do NOT include English
-        // or French words here — listing them was causing Whisper to switch
-        // languages and emit Latin-script text in the middle of Arabic
-        // transcripts. Keeping the prompt 100% Arabic locks the model to
-        // Arabic script output.
+        // Short, neutral Arabic prompt. Long keyword lists were biasing the
+        // model and causing it to repeat the same words. A minimal hint is
+        // enough to lock the script to Arabic without skewing output.
         const derjaPrompt =
-          "النص التالي مكتوب باللهجة التونسية الدارجة فقط، بالحروف العربية، مع علامات الترقيم الصحيحة. " +
-          "كلمات شائعة في الدارجة التونسية: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، نحب، نجم، باهي، نرمال، فما، موش، ماكش، تو، توا، يعيشك، صحة، ربي، إن شاء الله، يزي، أهلا، مرحبا، زادا، كان، إيا، أما، خاطر، حتى، عندي، عندك، نعمل، نمشي، نجي، شفت، قلت، قال، قالت، نقعد، نخدم، نشوف، نسمع، نقرا، نكتب، نتفرج، نضحك، نحكي. " +
-          "اكتب كل شيء بالعربية فقط، ولا تستعمل الحروف اللاتينية أبدا.";
+          "تفريغ صوتي باللهجة التونسية بالحروف العربية فقط، مع علامات الترقيم.";
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
         upstream.append("model", "whisper-large-v3");
         upstream.append("language", "ar");
         upstream.append("response_format", "verbose_json");
-        upstream.append("temperature", "0");
+        // Small non-zero temperature lets Whisper's fallback decoder break
+        // out of repetition loops when compression_ratio is too high.
+        upstream.append("temperature", "0.2");
         upstream.append("prompt", derjaPrompt);
 
         const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
@@ -66,15 +64,19 @@ export const Route = createFileRoute("/api/transcribe")({
           segments?: Array<{ id?: number; start: number; end: number; text: string }>;
         };
 
-        const segments = (data.segments ?? []).map((s, i) => ({
+        const rawSegments = (data.segments ?? []).map((s, i) => ({
           id: typeof s.id === "number" ? s.id : i,
           start: s.start,
           end: s.end,
-          text: (s.text || "").trim(),
+          text: dedupeRepeats((s.text || "").trim()),
         }));
 
+        // Drop segments that became empty after dedupe.
+        const segments = rawSegments.filter((s) => s.text.length > 0);
+
+        const fullText = dedupeRepeats((data.text || "").trim());
+
         // Forward Groq rate-limit headers so the UI can show "minutes left today".
-        // Groq sends values like "28800" (seconds) and reset like "23h59m59s".
         const h = res.headers;
         const rate = {
           limitAudioSeconds: numOrNull(h.get("x-ratelimit-limit-audio-seconds")),
@@ -84,7 +86,7 @@ export const Route = createFileRoute("/api/transcribe")({
           remainingRequests: numOrNull(h.get("x-ratelimit-remaining-requests")),
         };
 
-        return Response.json({ text: (data.text || "").trim(), segments, rate });
+        return Response.json({ text: fullText, segments, rate });
       },
     },
   },
@@ -94,4 +96,40 @@ function numOrNull(v: string | null): number | null {
   if (v == null) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+// Collapse Whisper repetition artifacts:
+//  - identical consecutive words ("نعم نعم نعم" -> "نعم")
+//  - identical consecutive short phrases (up to 5 words)
+//  - long runs of the same character ("اااااا" -> "اا")
+function dedupeRepeats(input: string): string {
+  if (!input) return input;
+  let s = input.replace(/(.)\1{4,}/g, "$1$1");
+
+  const tokens = s.split(/(\s+)/); // keep whitespace
+  const words = tokens.filter((t) => t.trim().length > 0);
+  if (words.length < 2) return s.trim();
+
+  // Remove consecutive duplicate words
+  const out: string[] = [];
+  for (const w of words) {
+    if (out.length && out[out.length - 1] === w) continue;
+    out.push(w);
+  }
+
+  // Remove consecutive duplicate n-grams (n=2..5)
+  for (let n = 5; n >= 2; n--) {
+    let i = 0;
+    while (i + 2 * n <= out.length) {
+      const a = out.slice(i, i + n).join(" ");
+      const b = out.slice(i + n, i + 2 * n).join(" ");
+      if (a === b) {
+        out.splice(i + n, n);
+      } else {
+        i++;
+      }
+    }
+  }
+
+  return out.join(" ").replace(/\s+([،.؟!,?.])/g, "$1").trim();
 }
