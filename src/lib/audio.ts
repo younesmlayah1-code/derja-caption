@@ -1,18 +1,25 @@
-// Extract audio from a video/audio file as a 16kHz mono WAV Blob.
-// This guarantees Whisper gets clean audio (no video container quirks that can
-// cause silent truncation) and keeps the file small so long clips fit under 25MB.
+// Extract audio from a video/audio file as 16kHz mono WAV chunks.
+// Whisper has a 25MB upload cap; at 16kHz/16-bit/mono that's ~13 minutes.
+// We chunk at 10 minutes to stay safely under the limit and to let very long
+// videos transcribe end-to-end instead of getting truncated.
 
 const TARGET_SAMPLE_RATE = 16000;
+const CHUNK_SECONDS = 600; // 10 min per chunk -> ~19 MB WAV
 
-export async function extractMonoWav(
+export type AudioChunk = {
+  blob: Blob;
+  startSec: number; // offset of this chunk inside the original file
+  durationSec: number;
+};
+
+export async function extractMonoWavChunks(
   file: File,
   onProgress?: (p: { stage: "decoding" | "resampling" | "encoding"; progress?: number }) => void,
-): Promise<Blob> {
+): Promise<AudioChunk[]> {
   onProgress?.({ stage: "decoding" });
 
   const arrayBuf = await file.arrayBuffer();
 
-  // Use a regular AudioContext just to decode — we'll resample manually.
   const AC: typeof AudioContext =
     (window as unknown as { AudioContext: typeof AudioContext; webkitAudioContext?: typeof AudioContext })
       .AudioContext ||
@@ -28,7 +35,7 @@ export async function extractMonoWav(
 
   onProgress?.({ stage: "resampling" });
 
-  // Downmix to mono.
+  // Downmix to mono at original sample rate.
   const channels = decoded.numberOfChannels;
   const inLen = decoded.length;
   const mono = new Float32Array(inLen);
@@ -41,7 +48,7 @@ export async function extractMonoWav(
     }
   }
 
-  // Resample to 16kHz using OfflineAudioContext.
+  // Resample whole thing to 16kHz mono.
   const targetLen = Math.ceil((inLen * TARGET_SAMPLE_RATE) / decoded.sampleRate);
   const offline = new OfflineAudioContext(1, targetLen, TARGET_SAMPLE_RATE);
   const monoBuf = offline.createBuffer(1, inLen, decoded.sampleRate);
@@ -51,10 +58,21 @@ export async function extractMonoWav(
   src.connect(offline.destination);
   src.start(0);
   const resampled = await offline.startRendering();
+  const samples = resampled.getChannelData(0);
 
   onProgress?.({ stage: "encoding" });
 
-  return encodeWav(resampled.getChannelData(0), TARGET_SAMPLE_RATE);
+  const chunkSamples = CHUNK_SECONDS * TARGET_SAMPLE_RATE;
+  const chunks: AudioChunk[] = [];
+  for (let i = 0; i < samples.length; i += chunkSamples) {
+    const slice = samples.subarray(i, Math.min(i + chunkSamples, samples.length));
+    chunks.push({
+      blob: encodeWav(slice, TARGET_SAMPLE_RATE),
+      startSec: i / TARGET_SAMPLE_RATE,
+      durationSec: slice.length / TARGET_SAMPLE_RATE,
+    });
+  }
+  return chunks;
 }
 
 function encodeWav(samples: Float32Array, sampleRate: number): Blob {
@@ -74,12 +92,12 @@ function encodeWav(samples: Float32Array, sampleRate: number): Blob {
   writeStr(8, "WAVE");
   writeStr(12, "fmt ");
   view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // PCM
-  view.setUint16(22, 1, true); // mono
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, byteRate, true);
   view.setUint16(32, blockAlign, true);
-  view.setUint16(34, 16, true); // bits per sample
+  view.setUint16(34, 16, true);
   writeStr(36, "data");
   view.setUint32(40, dataSize, true);
 
