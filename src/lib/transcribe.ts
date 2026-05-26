@@ -4,7 +4,7 @@ import type { Segment } from "./subtitles";
 // Use the Hugging Face CDN for model files (no local model hosting needed).
 env.allowLocalModels = false;
 
-const MODEL_ID = "Xenova/whisper-small";
+const MODEL_ID = "Xenova/whisper-tiny";
 
 let asrPromise: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
 
