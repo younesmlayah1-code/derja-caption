@@ -324,7 +324,7 @@ function Home() {
         )}
 
         <footer className="mt-16 text-center text-xs text-muted-foreground/60">
-          Powered by OpenAI Whisper · Built for Tunisian Derja
+          100% local · Whisper runs in your browser · Built for Tunisian Derja
         </footer>
       </div>
     </main>
