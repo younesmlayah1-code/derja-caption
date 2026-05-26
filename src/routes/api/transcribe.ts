@@ -29,23 +29,23 @@ export const Route = createFileRoute("/api/transcribe")({
           );
         }
 
-        // Derja-biasing prompt + optional running context from previous chunk
-        // to keep vocabulary and spelling consistent across long videos.
-        const context = (incoming.get("context") as string | null) || "";
+        // Pure-Arabic Derja prompt. We intentionally do NOT include English
+        // or French words here — listing them was causing Whisper to switch
+        // languages and emit Latin-script text in the middle of Arabic
+        // transcripts. Keeping the prompt 100% Arabic locks the model to
+        // Arabic script output.
         const derjaPrompt =
-          "نقل صوتي دقيق باللهجة التونسية الدارجة مع علامات الترقيم. " +
-          "كلمات شائعة: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، نحب، نجم، باهي، نرمال، فما، موش، ماكش، تو، توا، يعيشك، صحة، ربي، إنشاء الله، يزي، أهلا، مرحبا، زادا، كان، إيا، أما، خاطر، حتى، عندي، عندك، نعمل، نمشي، نجي، شفت، قلت، قال، قالت. " +
-          "قد تتضمن كلمات فرنسية مثل: normal, voilà, donc, parce que, déjà, bon, bref, ok, merci, salut.";
-        const fullPrompt = context ? `${derjaPrompt}\n\nسياق سابق: ${context}` : derjaPrompt;
+          "النص التالي مكتوب باللهجة التونسية الدارجة فقط، بالحروف العربية، مع علامات الترقيم الصحيحة. " +
+          "كلمات شائعة في الدارجة التونسية: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، نحب، نجم، باهي، نرمال، فما، موش، ماكش، تو، توا، يعيشك، صحة، ربي، إن شاء الله، يزي، أهلا، مرحبا، زادا، كان، إيا، أما، خاطر، حتى، عندي، عندك، نعمل، نمشي، نجي، شفت، قلت، قال، قالت، نقعد، نخدم، نشوف، نسمع، نقرا، نكتب، نتفرج، نضحك، نحكي. " +
+          "اكتب كل شيء بالعربية فقط، ولا تستعمل الحروف اللاتينية أبدا.";
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
-        // whisper-large-v3 = highest accuracy Groq offers for Arabic dialects.
         upstream.append("model", "whisper-large-v3");
         upstream.append("language", "ar");
         upstream.append("response_format", "verbose_json");
         upstream.append("temperature", "0");
-        upstream.append("prompt", fullPrompt);
+        upstream.append("prompt", derjaPrompt);
 
         const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
           method: "POST",
