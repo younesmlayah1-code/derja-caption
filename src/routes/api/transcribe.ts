@@ -74,7 +74,16 @@ export const Route = createFileRoute("/api/transcribe")({
         // Drop segments that became empty after dedupe.
         const segments = rawSegments.filter((s) => s.text.length > 0);
 
-        const fullText = dedupeRepeats((data.text || "").trim());
+        // Polish spelling, spacing, and punctuation with Lovable AI while
+        // preserving the original Derja words and meaning. Failures here are
+        // non-fatal — we fall back to the raw Whisper output.
+        const polishedSegments = await polishSegments(segments).catch((e: unknown) => {
+          console.error("polishSegments failed:", e);
+          return segments;
+        });
+
+        const fullText = polishedSegments.map((s: { text: string }) => s.text).join(" ").trim()
+          || dedupeRepeats((data.text || "").trim());
 
         // Forward Groq rate-limit headers so the UI can show "minutes left today".
         const h = res.headers;
@@ -86,7 +95,7 @@ export const Route = createFileRoute("/api/transcribe")({
           remainingRequests: numOrNull(h.get("x-ratelimit-remaining-requests")),
         };
 
-        return Response.json({ text: fullText, segments, rate });
+        return Response.json({ text: fullText, segments: polishedSegments, rate });
       },
     },
   },
@@ -96,6 +105,85 @@ function numOrNull(v: string | null): number | null {
   if (v == null) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+type PolishSeg = { id: number; start: number; end: number; text: string };
+
+// Use Lovable AI to fix spelling, spacing and punctuation in Derja segments
+// while preserving the original wording and meaning. Returns same shape with
+// cleaned text. Throws on hard failure; caller falls back to raw segments.
+async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
+  if (segments.length === 0) return segments;
+  const key = process.env.LOVABLE_API_KEY;
+  if (!key) return segments;
+
+  const payload = segments.map((s) => ({ id: s.id, text: s.text }));
+
+  const system =
+    "أنت محرر لغوي للهجة التونسية الدارجة. مهمتك تنظيف نص تفريغ صوتي: " +
+    "صحح الإملاء، أضف علامات الترقيم المناسبة (،.؟!)، أصلح المسافات، " +
+    "وأزل الكلمات المكررة بشكل خاطئ. " +
+    "حافظ بدقة على نفس الكلمات والمعنى واللهجة التونسية. لا تترجم للفصحى. " +
+    "لا تضف ولا تحذف معلومات. أرجع JSON فقط بنفس البنية: " +
+    '[{"id":number,"text":string}, ...]';
+
+  const userMsg = JSON.stringify(payload);
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Lovable-API-Key": key,
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userMsg },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Lovable AI polish failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
+  }
+
+  const j = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = j.choices?.[0]?.message?.content?.trim() ?? "";
+  if (!content) return segments;
+
+  // Model may return either a bare array or an object wrapping it.
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    const m = content.match(/\[[\s\S]*\]/);
+    if (!m) return segments;
+    parsed = JSON.parse(m[0]);
+  }
+
+  const arr: Array<{ id?: number; text?: string }> = Array.isArray(parsed)
+    ? (parsed as Array<{ id?: number; text?: string }>)
+    : Array.isArray((parsed as { segments?: unknown }).segments)
+      ? ((parsed as { segments: Array<{ id?: number; text?: string }> }).segments)
+      : [];
+
+  if (arr.length === 0) return segments;
+
+  const byId = new Map<number, string>();
+  for (const item of arr) {
+    if (typeof item?.id === "number" && typeof item?.text === "string") {
+      byId.set(item.id, item.text.trim());
+    }
+  }
+
+  return segments.map((s) => {
+    const cleaned = byId.get(s.id);
+    return cleaned && cleaned.length > 0 ? { ...s, text: cleaned } : s;
+  });
 }
 
 // Collapse only obvious Whisper hallucination loops. We DO NOT touch a single
