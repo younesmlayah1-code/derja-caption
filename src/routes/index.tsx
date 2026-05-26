@@ -212,7 +212,7 @@ function Home() {
                       />
                     </div>
                     <p className="mt-2 text-xs text-muted-foreground/70">
-                      First run downloads ~250MB. Cached afterwards.
+                      First run downloads ~40MB. Cached afterwards.
                     </p>
                   </div>
                 )}
