@@ -121,6 +121,22 @@ function Home() {
           </p>
         </header>
 
+        {rate && rate.remainingAudioSeconds != null && (
+          <div className="mx-auto mb-6 flex max-w-sm items-center justify-center gap-2 rounded-full border border-border bg-card/40 px-4 py-2 text-xs text-muted-foreground backdrop-blur">
+            <Clock className="h-3.5 w-3.5 text-primary" />
+            <span>
+              <span className="font-medium text-foreground">
+                {Math.max(0, Math.floor(rate.remainingAudioSeconds / 60))} min
+              </span>
+              {rate.limitAudioSeconds != null && (
+                <> / {Math.floor(rate.limitAudioSeconds / 60)} min</>
+              )}{" "}
+              left today
+              {rate.resetAudioSeconds ? ` · resets in ${rate.resetAudioSeconds}` : ""}
+            </span>
+          </div>
+        )}
+
         {!segments.length && (
           <section
             onDragOver={(e) => {
