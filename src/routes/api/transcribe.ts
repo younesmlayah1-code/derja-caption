@@ -77,12 +77,12 @@ export const Route = createFileRoute("/api/transcribe")({
         // Polish spelling, spacing, and punctuation with Lovable AI while
         // preserving the original Derja words and meaning. Failures here are
         // non-fatal — we fall back to the raw Whisper output.
-        const polishedSegments = await polishSegments(segments).catch((e) => {
+        const polishedSegments = await polishSegments(segments).catch((e: unknown) => {
           console.error("polishSegments failed:", e);
           return segments;
         });
 
-        const fullText = polishedSegments.map((s) => s.text).join(" ").trim()
+        const fullText = polishedSegments.map((s: { text: string }) => s.text).join(" ").trim()
           || dedupeRepeats((data.text || "").trim());
 
         // Forward Groq rate-limit headers so the UI can show "minutes left today".
