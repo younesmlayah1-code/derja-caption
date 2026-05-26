@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
 import { Upload, FileVideo, Loader2, Download, X, Languages } from "lucide-react";
 import { toSrt, toVtt, fmtTime, downloadFile, type Segment } from "@/lib/subtitles";
-import { transcribeFile, type LoadProgress } from "@/lib/transcribe";
+import { transcribeFile } from "@/lib/transcribe";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -27,8 +27,6 @@ type Status = "idle" | "uploading" | "transcribing" | "done" | "error";
 function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>("idle");
-  const [modelProgress, setModelProgress] = useState(0);
-  const [modelStatus, setModelStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>("");
   const [segments, setSegments] = useState<Segment[]>([]);
