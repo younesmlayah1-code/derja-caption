@@ -19,10 +19,10 @@ export type LoadProgress = {
 export function getModel(onProgress?: (p: LoadProgress) => void) {
   if (!asrPromise) {
     asrPromise = pipeline("automatic-speech-recognition", MODEL_ID, {
-      // q8 on the decoder embeddings breaks ORT on some builds; use fp32 encoder + q8 decoder.
+      // Quantized decoder embeddings are broken in current ORT — use fp32 weights everywhere.
       dtype: {
         encoder_model: "fp32",
-        decoder_model_merged: "q8",
+        decoder_model_merged: "fp32",
       },
       device: "wasm",
       progress_callback: onProgress as never,
