@@ -4,8 +4,8 @@ import { Upload, FileVideo, Loader2, Download, X, Languages, Clock } from "lucid
 import {
   toSrt,
   toVtt,
-  toWordSrt,
-  toWordVtt,
+  toWordSrtFromSegments,
+  toWordVttFromSegments,
   fmtTime,
   downloadFile,
   type Segment,
