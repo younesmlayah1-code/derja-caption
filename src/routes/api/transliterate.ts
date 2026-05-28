@@ -43,10 +43,17 @@ async function transliterateChunk(items: Item[], key: string): Promise<Item[]> {
   const system =
     "أنت خبير في كتابة اللهجة التونسية (الدارجة) بالحروف اللاتينية كما يكتبها التوانسة في الشات (Arabizi / Franco-Arabe). " +
     "حوّل كل نص عربي مكتوب بالحروف العربية إلى نفس الكلام بالحروف اللاتينية بأسلوب تونسي طبيعي. " +
-    "استعمل الأرقام: 3=ع، 5=خ، 7=ح، 9=ق، 2=ء/همزة. مثال: نخدم→nekhdem أو ne5dem، مريول→maryoul، يعيشك→y3aychek، شنوة→chnowa، برشا→barcha، علاش→3lech، كيفاش→kifech، صباح الخير→sba7 el khir. " +
-    "مهم جداً: إذا كانت كلمة مكتوبة بالحروف العربية لكنها في الأصل كلمة فرنسية أو إنجليزية " +
-    "(مثل: برودو=produit، مونتاج=montage، بيزنس=business، ماركتينغ=marketing، بروبلام=problème، سارفيس=service، أورديناتور=ordinateur، تيليفون=téléphone، فيديو=video، إيمايل=email، كومبيوتر=computer)، " +
-    "اكتبها بالإملاء الصحيح للغة الأصلية، وليس transliteration حرفي. " +
+    "استعمل الأرقام: 3=ع، 5=خ، 7=ح، 9=ق، 2=ء/همزة. " +
+    "أمثلة دارجة: نخدم→nekhdem، مريول→maryoul، يعيشك→y3aychek، شنوة→chnowa، برشا→barcha، علاش→3lech، كيفاش→kifech، صباح الخير→sba7 el khir، الناس→ennes، اتبعها→ettab3a. " +
+    "ممنوع منعاً باتاً استعمال الشرطة '-' داخل أو بين الكلمات. اكتب الكلمات ملتصقة بدون أي '-' (مثال: ennes وليس en-nes، ettab3a وليس ett-ab3a، essa77a وليس es-sa77a). " +
+    "مهم جداً: إذا كانت كلمة مكتوبة بالحروف العربية لكنها في الأصل كلمة فرنسية أو إنجليزية، اكتبها بالإملاء الفرنسي/الإنجليزي الصحيح، وليس transliteration حرفي. " +
+    "أمثلة لكلمات قروض فرنسية شائعة في الدارجة التونسية يجب كتابتها بإملائها الأصلي: " +
+    "باك=bac (شهادة الباكالوريا)، ليسي=lycée، تريزا=treize، كاتورز=quatorze، كانز=quinze، سيز=seize، ديزانوف=dix-neuf، " +
+    "برودو=produit، مونتاج=montage، بيزنس=business، ماركتينغ=marketing، بروبلام=problème، سارفيس=service، " +
+    "أورديناتور=ordinateur، تيليفون=téléphone، فيديو=vidéo، إيمايل=email، كومبيوتر=computer، " +
+    "كار=car، طوموبيل=automobile، تاكسي=taxi، ميترو=métro، طرين=train، أوتيل=hôtel، ريستوران=restaurant، كافي=café، " +
+    "بوتيك=boutique، ماغازا=magasin، فاميليا=famille، أوسبيتال=hôpital، فارماسي=pharmacie، دوكتور=docteur، أنفيرمياي=infirmier، " +
+    "تيلي=télé، راديو=radio، جورنال=journal، فوطو=photo، آبارتمو=appartement، كوزينا=cuisine، فريجو=frigo. " +
     "أي كلمة فرنسية أو إنجليزية مكتوبة أصلاً بالحروف اللاتينية اتركها كما هي. " +
     "حافظ على نفس الكلمات والمعنى وعلامات الترقيم. لا تترجم ولا تضيف ولا تحذف شيء. " +
     'أرجع JSON فقط بنفس البنية: {"items":[{"id":...,"text":"..."}]}';
@@ -89,8 +96,16 @@ async function transliterateChunk(items: Item[], key: string): Promise<Item[]> {
   const byId = new Map<string, string>();
   for (const it of arr) {
     if (it && (typeof it.id === "number" || typeof it.id === "string") && typeof it.text === "string") {
-      byId.set(String(it.id), it.text);
+      byId.set(String(it.id), stripHyphens(it.text));
     }
   }
   return items.map((it) => ({ id: it.id, text: byId.get(String(it.id)) ?? it.text }));
+}
+
+// Remove hyphens inserted between Latin letters / digits within a single word
+// (e.g. "en-nes" → "ennes", "ett-ab3a" → "ettab3a"). Keeps real hyphenated
+// French words intact only when both sides include a vowel-rich pattern is
+// hard to detect, so we simply collapse all intra-word hyphens.
+function stripHyphens(text: string): string {
+  return text.replace(/([A-Za-z0-9'])-+([A-Za-z0-9'])/g, "$1$2");
 }
