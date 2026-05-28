@@ -428,7 +428,7 @@ function Home() {
                     : undefined
                 }
               >
-                {applyScript(transcript, script)}
+                {frenchOf(transcript)}
               </p>
             </div>
 
@@ -463,14 +463,14 @@ function Home() {
                               title={`${fmtTime(w.start)} – ${fmtTime(w.end)}`}
                               className="group inline-flex flex-col items-center rounded-md px-1.5 py-0.5 hover:bg-primary/15"
                             >
-                              <span>{applyScript(w.text, script)}</span>
+                              <span>{frenchOf(w.text)}</span>
                               <span className="font-mono text-[10px] text-muted-foreground/70">
                                 {fmtTime(w.start)}
                               </span>
                             </span>
                           ))
                         ) : (
-                          <span>{applyScript(s.text, script)}</span>
+                          <span>{frenchOf(s.text)}</span>
                         )}
                       </div>
                     </div>
