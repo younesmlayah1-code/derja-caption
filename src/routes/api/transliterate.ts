@@ -68,6 +68,7 @@ async function transliterateChunk(items: Item[], key: string): Promise<Item[]> {
     },
     body: JSON.stringify({
       model: "google/gemini-3-flash-preview",
+      temperature: 0,
       messages: [
         { role: "system", content: system },
         { role: "user", content: JSON.stringify({ items }) },
@@ -75,6 +76,7 @@ async function transliterateChunk(items: Item[], key: string): Promise<Item[]> {
       response_format: { type: "json_object" },
     }),
   });
+
 
   if (!res.ok) {
     throw new Error(`AI transliterate failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
