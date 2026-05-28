@@ -6,10 +6,10 @@ import {
   toVtt,
   toWordSrtFromSegments,
   toWordVttFromSegments,
+  segmentToWordCues,
   fmtTime,
   downloadFile,
   type Segment,
-  type Word,
 } from "@/lib/subtitles";
 import { transcribeFile, type RateInfo } from "@/lib/transcribe";
 
@@ -47,7 +47,6 @@ function Home() {
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>("");
   const [segments, setSegments] = useState<Segment[]>([]);
-  const [words, setWords] = useState<Word[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -70,7 +69,6 @@ function Home() {
     setFile(f);
     setTranscript("");
     setSegments([]);
-    setWords([]);
     setStatus("idle");
   };
 
@@ -95,7 +93,6 @@ function Home() {
 
       setTranscript(result.text);
       setSegments(result.segments);
-      setWords(result.words);
       if (result.rate) setRate(result.rate);
       setStatus("done");
     } catch (e) {
@@ -109,7 +106,6 @@ function Home() {
     setFile(null);
     setTranscript("");
     setSegments([]);
-    setWords([]);
     setStatus("idle");
     setError(null);
   };
@@ -312,38 +308,41 @@ function Home() {
                 Timestamped captions
               </h3>
               <div className="max-h-96 space-y-2 overflow-y-auto pr-2">
-                {segments.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex gap-3 rounded-xl bg-secondary/40 p-3 transition-colors hover:bg-secondary/70"
-                  >
-                    <span className="shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
-                      {fmtTime(s.start)}
-                    </span>
+                {segments.map((s) => {
+                  const captionWords = segmentToWordCues(s);
+                  return (
                     <div
-                      dir="rtl"
-                      className="flex flex-1 flex-wrap justify-end gap-1.5 text-right text-sm leading-relaxed"
-                      style={{ fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }}
+                      key={s.id}
+                      className="flex gap-3 rounded-xl bg-secondary/40 p-3 transition-colors hover:bg-secondary/70"
                     >
-                      {s.words && s.words.length > 0 ? (
-                        s.words.map((w, i) => (
-                          <span
-                            key={i}
-                            title={`${fmtTime(w.start)} – ${fmtTime(w.end)}`}
-                            className="group inline-flex flex-col items-center rounded-md px-1.5 py-0.5 hover:bg-primary/15"
-                          >
-                            <span>{w.text}</span>
-                            <span className="font-mono text-[10px] text-muted-foreground/70">
-                              {fmtTime(w.start)}
+                      <span className="shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
+                        {fmtTime(s.start)}
+                      </span>
+                      <div
+                        dir="rtl"
+                        className="flex flex-1 flex-wrap justify-end gap-1.5 text-right text-sm leading-relaxed"
+                        style={{ fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }}
+                      >
+                        {captionWords.length > 0 ? (
+                          captionWords.map((w, i) => (
+                            <span
+                              key={i}
+                              title={`${fmtTime(w.start)} – ${fmtTime(w.end)}`}
+                              className="group inline-flex flex-col items-center rounded-md px-1.5 py-0.5 hover:bg-primary/15"
+                            >
+                              <span>{w.text}</span>
+                              <span className="font-mono text-[10px] text-muted-foreground/70">
+                                {fmtTime(w.start)}
+                              </span>
                             </span>
-                          </span>
-                        ))
-                      ) : (
-                        <span>{s.text}</span>
-                      )}
+                          ))
+                        ) : (
+                          <span>{s.text}</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

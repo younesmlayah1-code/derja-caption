@@ -51,7 +51,7 @@ export function toWordSrt(words: Word[]) {
 // words. This guarantees the SRT wording matches the on-screen transcript.
 // Timings come from segment.words when token counts line up; otherwise we
 // distribute evenly across the segment duration.
-function segmentToWordCues(seg: Segment): Word[] {
+export function segmentToWordCues(seg: Segment): Word[] {
   const tokens = (seg.text || "").split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return [];
   const srcWords = (seg.words || []).filter((w) => w.text);
