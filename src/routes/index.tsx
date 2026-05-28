@@ -178,8 +178,29 @@ function Home() {
 
   const frenchOf = (t: string) => (script === "french" ? (frenchMap.get(t) ?? t) : t);
 
-  const updateSegmentText = (id: number, text: string) => {
-    setSegments((prev) => prev.map((s) => (s.id === id ? { ...s, text, words: undefined } : s)));
+  // Per-segment display text. In French mode user edits are kept as
+  // `frenchOverrides` so the AI/transliteration map doesn't snap them back.
+  const displayFor = (s: Segment) =>
+    script === "french" ? (frenchOverrides.get(s.id) ?? frenchOf(s.text)) : s.text;
+
+  const updateSegmentDisplay = (id: number, value: string) => {
+    if (script === "french") {
+      setFrenchOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(id, value);
+        return next;
+      });
+    } else {
+      setSegments((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, text: value, words: undefined } : s)),
+      );
+      setFrenchOverrides((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   };
 
   const deleteSegment = (id: number) => {
