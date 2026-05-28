@@ -108,7 +108,7 @@ function Home() {
       });
 
       setTranscript(result.text);
-      setSegments(result.segments);
+      setSegments(splitLongSegments(result.segments));
       setFrenchMap(new Map());
       setFrenchOverrides(new Map());
       if (result.rate) setRate(result.rate);
