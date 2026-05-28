@@ -153,8 +153,9 @@ export function toWordVttFromSegments(segments: Segment[]) {
 export function toVtt(segments: Segment[]) {
   return (
     "WEBVTT\n\n" +
-    flattenWords(segments)
-      .map((s) => `${fmtVtt(s.start)} --> ${fmtVtt(s.end)}\n${s.text}\n`)
+    segments
+      .filter((s) => (s.text || "").trim().length > 0)
+      .map((s) => `${fmtVtt(s.start)} --> ${fmtVtt(s.end)}\n${s.text.trim()}\n`)
       .join("\n")
   );
 }
