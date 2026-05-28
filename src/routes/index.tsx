@@ -198,6 +198,39 @@ function Home() {
     });
   };
 
+  const [editingFull, setEditingFull] = useState(false);
+  const [draftFull, setDraftFull] = useState("");
+
+  const saveFullTranscript = () => {
+    const newWords = draftFull.trim().split(/\s+/).filter(Boolean);
+    if (segments.length === 0) {
+      setEditingFull(false);
+      return;
+    }
+    const counts = segments.map(
+      (s) => s.text.trim().split(/\s+/).filter(Boolean).length || 1,
+    );
+    const total = counts.reduce((a, b) => a + b, 0);
+    let idx = 0;
+    const allocations = counts.map((c, i) => {
+      if (i === counts.length - 1) return Math.max(0, newWords.length - idx);
+      const n = Math.max(0, Math.round((newWords.length * c) / total));
+      idx += n;
+      return n;
+    });
+    idx = 0;
+    setSegments((prev) =>
+      prev.map((s, i) => {
+        const take = allocations[i];
+        const slice = newWords.slice(idx, idx + take).join(" ");
+        idx += take;
+        return { ...s, text: slice, words: undefined };
+      }),
+    );
+    setEditingFull(false);
+  };
+
+
   // Live transcript derived from current segments — reflects all edits.
   const liveTranscript = segments.map((s) => s.text).join(" ").trim() || transcript;
 
