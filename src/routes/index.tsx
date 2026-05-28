@@ -84,6 +84,7 @@ function Home() {
     setTranscript("");
     setSegments([]);
     setFrenchMap(new Map());
+    setFrenchOverrides(new Map());
     setStatus("idle");
   };
 
