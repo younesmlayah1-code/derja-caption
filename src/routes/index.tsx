@@ -221,154 +221,8 @@ function Home() {
     });
   };
 
-  const [editingFull, setEditingFull] = useState(false);
-  const [draftFull, setDraftFull] = useState("");
 
-  const fmtExactTime = (t: number) => {
-    const totalMs = Math.max(0, Math.round(t * 1000));
-    const m = Math.floor(totalMs / 60_000);
-    const s = Math.floor((totalMs % 60_000) / 1000);
-    const ms = totalMs % 1000;
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
-  };
 
-  // Format used in the bulk editor: "[mm:ss.mmm] text" per line. On save,
-  // existing rows are matched back to their original segment start so normal
-  // text edits never rewrite video timing.
-  const parseTimePrefix = (line: string): { start: number | null; text: string } => {
-    const m = line.match(/^\s*\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)$/);
-    if (!m) return { start: null, text: line.trim() };
-    const mm = parseInt(m[1], 10);
-    const ss = parseInt(m[2], 10);
-    const ms = m[3] ? parseInt(m[3].padEnd(3, "0"), 10) / 1000 : 0;
-    return { start: mm * 60 + ss + ms, text: m[4].trim() };
-  };
-
-  const buildDraft = () =>
-    segments.map((s) => `[${fmtExactTime(s.start)}] ${displayFor(s)}`).join("\n");
-
-  const saveFullTranscript = () => {
-    const rawLines = draftFull
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0);
-    if (rawLines.length === 0) {
-      setEditingFull(false);
-      return;
-    }
-    const parsed = rawLines.map(parseTimePrefix);
-
-    // Match each draft line back to an existing segment by timestamp (or
-    // positional fallback) so we can route the edit to the right place.
-    const matchSegments = (prev: Segment[]) => {
-      const used = new Set<number>();
-      const take = (start: number | null, fallbackIndex: number) => {
-        if (start != null) {
-          let bestIndex = -1;
-          let bestDiff = Infinity;
-          for (let i = 0; i < prev.length; i++) {
-            if (used.has(i)) continue;
-            const diff = Math.abs(prev[i].start - start);
-            if (diff < bestDiff) {
-              bestDiff = diff;
-              bestIndex = i;
-            }
-          }
-          if (bestIndex !== -1 && bestDiff <= 0.05) {
-            used.add(bestIndex);
-            return prev[bestIndex];
-          }
-        }
-        if (prev[fallbackIndex] && !used.has(fallbackIndex) && start == null) {
-          used.add(fallbackIndex);
-          return prev[fallbackIndex];
-        }
-        return null;
-      };
-      return parsed.map((p, i) => ({ p, base: take(p.start, i) }));
-    };
-
-    if (script === "french") {
-      // In French mode, never rewrite Arabic source — store edits as overrides
-      // keyed by the matched segment id. New (unmatched) lines fall back to
-      // creating a new segment whose Arabic text is the typed Latin string.
-      const matches = matchSegments(segments);
-      setFrenchOverrides((prev) => {
-        const next = new Map(prev);
-        for (const { p, base } of matches) {
-          if (base) next.set(base.id, p.text);
-        }
-        return next;
-      });
-      // Handle insertions/deletions if line count changed.
-      const hasNewLines = matches.some((m) => !m.base);
-      const matchedIds = new Set(
-        matches.filter((m) => m.base).map((m) => m.base!.id),
-      );
-      const droppedAny = segments.some((s) => !matchedIds.has(s.id));
-      if (hasNewLines || droppedAny) {
-        setSegments((prev) => {
-          let nextId = prev.length ? Math.max(...prev.map((p) => p.id)) + 1 : 1;
-          let carryEnd = prev[0]?.start ?? 0;
-          const usedIds = new Set<number>();
-          const out: Segment[] = [];
-          const remathches = matchSegments(prev);
-          for (let i = 0; i < remathches.length; i++) {
-            const { p, base } = remathches[i];
-            if (base) {
-              usedIds.add(base.id);
-              carryEnd = base.end;
-              out.push(base);
-            } else {
-              const nextTimed = parsed
-                .slice(i + 1)
-                .find((item) => item.start != null)?.start;
-              const start = p.start ?? carryEnd;
-              const end = Math.max(
-                start + 0.5,
-                nextTimed != null && nextTimed > start ? nextTimed : start + 2,
-              );
-              carryEnd = end;
-              const id = nextId++;
-              // Store typed Latin text as override for the new segment.
-              setFrenchOverrides((prevMap) => {
-                const m = new Map(prevMap);
-                m.set(id, p.text);
-                return m;
-              });
-              out.push({ id, start, end, text: p.text, words: undefined });
-            }
-          }
-          return out;
-        });
-      }
-      setEditingFull(false);
-      return;
-    }
-
-    // Arabic mode: edits update the source text on each segment.
-    setSegments((prev) => {
-      if (prev.length === 0) return prev;
-      let nextId = Math.max(...prev.map((p) => p.id)) + 1;
-      let carryEnd = prev[0].start;
-      const remathches = matchSegments(prev);
-      return remathches.map(({ p, base }, i) => {
-        if (base) {
-          carryEnd = base.end;
-          return { ...base, text: p.text, words: undefined };
-        }
-        const nextTimed = parsed.slice(i + 1).find((item) => item.start != null)?.start;
-        const start = p.start ?? carryEnd;
-        const end = Math.max(
-          start + 0.5,
-          nextTimed != null && nextTimed > start ? nextTimed : start + 2,
-        );
-        carryEnd = end;
-        return { id: nextId++, start, end, text: p.text, words: undefined };
-      });
-    });
-    setEditingFull(false);
-  };
 
   // Live transcript derived from current segments — reflects all edits.
   const liveTranscript =
@@ -625,64 +479,11 @@ function Home() {
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-muted-foreground">Full transcript</h3>
-                {!editingFull ? (
-                  <button
-                    onClick={() => {
-                      setDraftFull(buildDraft());
-                      setEditingFull(true);
-                    }}
-                    className="rounded-lg bg-secondary px-3 py-1 text-xs hover:bg-secondary/80"
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setEditingFull(false)}
-                      className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium hover:bg-secondary/80"
-                    >
-                      Cancel editing
-                    </button>
-                    <button
-                      onClick={saveFullTranscript}
-                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-                    >
-                      Save changes
-                    </button>
-                  </div>
-                )}
+                <span className="text-xs text-muted-foreground/70">
+                  Edit below in the timestamped captions
+                </span>
               </div>
-              {editingFull ? (
-                <>
-                  <div className="mb-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-foreground">
-                    <p className="font-semibold text-primary">How to edit</p>
-                    <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed">
-                      <li>
-                        Edit the words freely — the{" "}
-                        <code className="rounded bg-secondary/60 px-1 font-mono">[mm:ss.mmm]</code>{" "}
-                        at the start of each line keeps the timing locked to the video.
-                      </li>
-                      <li>Add or remove whole lines to insert / delete segments.</li>
-                      <li>
-                        Click <span className="font-semibold">Save changes</span> when you&apos;re
-                        done, or <span className="font-semibold">Cancel editing</span> to discard.
-                      </li>
-                    </ul>
-                  </div>
-                  <textarea
-                    value={draftFull}
-                    onChange={(e) => setDraftFull(e.target.value)}
-                    dir={script === "arabic" ? "rtl" : "ltr"}
-                    rows={Math.min(20, Math.max(8, draftFull.split("\n").length + 1))}
-                    className={`w-full resize-y rounded-xl border-2 border-primary/30 bg-background p-4 text-base leading-loose focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${script === "arabic" ? "text-right" : "text-left"}`}
-                    style={
-                      script === "arabic"
-                        ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
-                        : undefined
-                    }
-                  />
-                </>
-              ) : script === "french" && translitLoading ? (
+              {script === "french" && translitLoading ? (
                 <div className="flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-6 text-sm text-primary">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Please wait — converting Derja to French script…
@@ -702,13 +503,14 @@ function Home() {
               )}
             </div>
 
+
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-muted-foreground">
                   Timestamped captions
                 </h3>
-                <span className="text-xs text-muted-foreground/70">
-                  Click any line to edit · changes save automatically
+                <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                  Tap any line below to edit · changes save automatically
                 </span>
               </div>
               {script === "french" && translitLoading ? (
@@ -717,13 +519,13 @@ function Home() {
                   Please wait — converting Derja to French script…
                 </div>
               ) : (
-                <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-2">
+                <div className="max-h-[32rem] space-y-3 overflow-y-auto pr-2">
                   {segments.map((s) => {
                     const captionWords = exportMode === "word" ? segmentToWordCues(s) : [];
                     const displayText = displayFor(s);
                     return (
-                      <div key={s.id} className="group/row space-y-1">
-                        <div className="flex items-start gap-2 rounded-xl bg-secondary/40 p-3 transition-colors hover:bg-secondary/70">
+                      <div key={s.id} className="group/row">
+                        <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3 transition-colors focus-within:border-primary/60 focus-within:bg-background/60 hover:bg-secondary/60">
                           <span className="mt-1 shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
                             {fmtTime(s.start)}
                           </span>
@@ -732,10 +534,11 @@ function Home() {
                               value={displayText}
                               onChange={(e) => updateSegmentDisplay(s.id, e.target.value)}
                               dir={script === "arabic" ? "rtl" : "ltr"}
-                              rows={Math.min(6, Math.max(1, Math.ceil(displayText.length / 50)))}
-                              className={`w-full resize-none rounded-md bg-transparent text-sm leading-relaxed focus:bg-background/60 focus:outline-none focus:ring-1 focus:ring-primary/40 ${
+                              rows={Math.min(6, Math.max(2, Math.ceil(displayText.length / 40)))}
+                              className={`w-full resize-y rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-base leading-relaxed shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${
                                 script === "arabic" ? "text-right" : "text-left"
                               }`}
+
                             style={
                               script === "arabic"
                                 ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
