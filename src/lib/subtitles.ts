@@ -47,6 +47,43 @@ export function toWordSrt(words: Word[]) {
     .join("\n");
 }
 
+// Build word-level cues using the (polished) segment TEXT, not raw Whisper
+// words. This guarantees the SRT wording matches the on-screen transcript.
+// Timings come from segment.words when token counts line up; otherwise we
+// distribute evenly across the segment duration.
+function segmentToWordCues(seg: Segment): Word[] {
+  const tokens = (seg.text || "").split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return [];
+  const srcWords = (seg.words || []).filter((w) => w.text);
+
+  if (srcWords.length === tokens.length) {
+    return tokens.map((t, i) => ({ start: srcWords[i].start, end: srcWords[i].end, text: t }));
+  }
+
+  const dur = Math.max(0.001, seg.end - seg.start);
+  const step = dur / tokens.length;
+  return tokens.map((t, i) => ({
+    start: seg.start + step * i,
+    end: seg.start + step * (i + 1),
+    text: t,
+  }));
+}
+
+export function toWordSrtFromSegments(segments: Segment[]) {
+  const cues = segments.flatMap(segmentToWordCues);
+  return cues
+    .map((w, i) => `${i + 1}\n${fmtSrt(w.start)} --> ${fmtSrt(w.end)}\n${w.text}\n`)
+    .join("\n");
+}
+
+export function toWordVttFromSegments(segments: Segment[]) {
+  const cues = segments.flatMap(segmentToWordCues);
+  return (
+    "WEBVTT\n\n" +
+    cues.map((w) => `${fmtVtt(w.start)} --> ${fmtVtt(w.end)}\n${w.text}\n`).join("\n")
+  );
+}
+
 export function toVtt(segments: Segment[]) {
   return (
     "WEBVTT\n\n" +
