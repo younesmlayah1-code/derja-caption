@@ -521,70 +521,85 @@ function Home() {
               ) : (
                 <div className="max-h-[32rem] space-y-3 overflow-y-auto pr-2">
                   {segments.map((s) => {
-                    const captionWords = exportMode === "word" ? segmentToWordCues(s) : [];
                     const displayText = displayFor(s);
+                    const captionWords =
+                      exportMode === "word"
+                        ? segmentToWordCues({ ...s, text: displayText })
+                        : [];
                     return (
                       <div key={s.id} className="group/row">
                         <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3 transition-colors focus-within:border-primary/60 focus-within:bg-background/60 hover:bg-secondary/60">
                           <span className="mt-1 shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
                             {fmtTime(s.start)}
                           </span>
-                          <div className="flex flex-1 flex-col gap-1.5">
-                            <textarea
-                              value={displayText}
-                              onChange={(e) => updateSegmentDisplay(s.id, e.target.value)}
-                              dir={script === "arabic" ? "rtl" : "ltr"}
-                              rows={Math.min(6, Math.max(2, Math.ceil(displayText.length / 40)))}
-                              className={`w-full resize-y rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-base leading-relaxed shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${
-                                script === "arabic" ? "text-right" : "text-left"
-                              }`}
-
-                            style={
-                              script === "arabic"
-                                ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
-                                : undefined
-                            }
-                          />
-                          {captionWords.length > 0 && (
-                            <div
-                              dir={script === "arabic" ? "rtl" : "ltr"}
-                              className={`flex flex-wrap gap-1 text-[10px] text-muted-foreground/70 ${
-                                script === "arabic" ? "justify-end" : "justify-start"
-                              }`}
+                          <div className="flex flex-1 flex-col gap-2">
+                            {exportMode === "line" ? (
+                              <textarea
+                                value={displayText}
+                                onChange={(e) => updateSegmentDisplay(s.id, e.target.value)}
+                                dir={script === "arabic" ? "rtl" : "ltr"}
+                                rows={Math.min(6, Math.max(2, Math.ceil(displayText.length / 40)))}
+                                className={`w-full resize-y rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-base leading-relaxed shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${
+                                  script === "arabic" ? "text-right" : "text-left"
+                                }`}
+                                style={
+                                  script === "arabic"
+                                    ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
+                                    : undefined
+                                }
+                              />
+                            ) : (
+                              <div
+                                dir={script === "arabic" ? "rtl" : "ltr"}
+                                className={`flex flex-wrap gap-1.5 ${
+                                  script === "arabic" ? "justify-end" : "justify-start"
+                                }`}
+                                style={
+                                  script === "arabic"
+                                    ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
+                                    : undefined
+                                }
+                              >
+                                {captionWords.map((w, i) => (
+                                  <span
+                                    key={i}
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/70 px-2 py-1 text-sm"
+                                  >
+                                    <span>{w.text}</span>
+                                    <span className="font-mono text-[10px] text-muted-foreground/70">
+                                      {fmtTime(w.start)}
+                                    </span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover/row:opacity-100">
+                            <button
+                              onClick={() => addSegmentAfter(s.id)}
+                              className="rounded-md p-1.5 text-muted-foreground hover:bg-primary/15 hover:text-primary"
+                              aria-label="Add segment below"
+                              title="Add segment below"
                             >
-                              {captionWords.map((w, i) => (
-                                <span key={i} className="font-mono">
-                                  {fmtTime(w.start)}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover/row:opacity-100">
-                          <button
-                            onClick={() => addSegmentAfter(s.id)}
-                            className="rounded-md p-1.5 text-muted-foreground hover:bg-primary/15 hover:text-primary"
-                            aria-label="Add segment below"
-                            title="Add segment below"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => deleteSegment(s.id)}
-                            className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
-                            aria-label="Delete segment"
-                            title="Delete segment"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => deleteSegment(s.id)}
+                              className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                              aria-label="Delete segment"
+                              title="Delete segment"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
+                    );
                   })}
                 </div>
               )}
             </div>
+
 
             <div className="grid grid-cols-3 gap-2">
               {[
