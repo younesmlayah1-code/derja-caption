@@ -370,10 +370,10 @@ function Home() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {translitLoading && script === "french" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : null}
-                Derja · French
+                {translitLoading && script === "french"
+                  ? "Please wait…"
+                  : "Derja · French"}
+
               </button>
             </div>
           </div>
