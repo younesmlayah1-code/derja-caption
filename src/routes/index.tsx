@@ -84,6 +84,7 @@ function Home() {
     setTranscript("");
     setSegments([]);
     setFrenchMap(new Map());
+    setFrenchOverrides(new Map());
     setStatus("idle");
   };
 
@@ -109,6 +110,7 @@ function Home() {
       setTranscript(result.text);
       setSegments(result.segments);
       setFrenchMap(new Map());
+      setFrenchOverrides(new Map());
       if (result.rate) setRate(result.rate);
       setStatus("done");
     } catch (e) {
@@ -123,11 +125,13 @@ function Home() {
     setTranscript("");
     setSegments([]);
     setFrenchMap(new Map());
+    setFrenchOverrides(new Map());
     setStatus("idle");
     setError(null);
   };
 
   const [frenchMap, setFrenchMap] = useState<Map<string, string>>(new Map());
+  const [frenchOverrides, setFrenchOverrides] = useState<Map<number, string>>(new Map());
   const [translitLoading, setTranslitLoading] = useState(false);
 
   useEffect(() => {
@@ -174,8 +178,29 @@ function Home() {
 
   const frenchOf = (t: string) => (script === "french" ? (frenchMap.get(t) ?? t) : t);
 
-  const updateSegmentText = (id: number, text: string) => {
-    setSegments((prev) => prev.map((s) => (s.id === id ? { ...s, text, words: undefined } : s)));
+  // Per-segment display text. In French mode user edits are kept as
+  // `frenchOverrides` so the AI/transliteration map doesn't snap them back.
+  const displayFor = (s: Segment) =>
+    script === "french" ? (frenchOverrides.get(s.id) ?? frenchOf(s.text)) : s.text;
+
+  const updateSegmentDisplay = (id: number, value: string) => {
+    if (script === "french") {
+      setFrenchOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(id, value);
+        return next;
+      });
+    } else {
+      setSegments((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, text: value, words: undefined } : s)),
+      );
+      setFrenchOverrides((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   };
 
   const deleteSegment = (id: number) => {
@@ -220,7 +245,7 @@ function Home() {
   };
 
   const buildDraft = () =>
-    segments.map((s) => `[${fmtExactTime(s.start)}] ${frenchOf(s.text)}`).join("\n");
+    segments.map((s) => `[${fmtExactTime(s.start)}] ${displayFor(s)}`).join("\n");
 
   const saveFullTranscript = () => {
     const rawLines = draftFull
@@ -232,13 +257,12 @@ function Home() {
       return;
     }
     const parsed = rawLines.map(parseTimePrefix);
-    setSegments((prev) => {
-      if (prev.length === 0) return prev;
-      let nextId = Math.max(...prev.map((p) => p.id)) + 1;
-      const used = new Set<number>();
-      let carryEnd = prev[0].start;
 
-      const takeMatchingSegment = (start: number | null, fallbackIndex: number) => {
+    // Match each draft line back to an existing segment by timestamp (or
+    // positional fallback) so we can route the edit to the right place.
+    const matchSegments = (prev: Segment[]) => {
+      const used = new Set<number>();
+      const take = (start: number | null, fallbackIndex: number) => {
         if (start != null) {
           let bestIndex = -1;
           let bestDiff = Infinity;
@@ -255,22 +279,84 @@ function Home() {
             return prev[bestIndex];
           }
         }
-
         if (prev[fallbackIndex] && !used.has(fallbackIndex) && start == null) {
           used.add(fallbackIndex);
           return prev[fallbackIndex];
         }
-
         return null;
       };
+      return parsed.map((p, i) => ({ p, base: take(p.start, i) }));
+    };
 
-      return parsed.map((p, i) => {
-        const base = takeMatchingSegment(p.start, i);
+    if (script === "french") {
+      // In French mode, never rewrite Arabic source — store edits as overrides
+      // keyed by the matched segment id. New (unmatched) lines fall back to
+      // creating a new segment whose Arabic text is the typed Latin string.
+      const matches = matchSegments(segments);
+      setFrenchOverrides((prev) => {
+        const next = new Map(prev);
+        for (const { p, base } of matches) {
+          if (base) next.set(base.id, p.text);
+        }
+        return next;
+      });
+      // Handle insertions/deletions if line count changed.
+      const hasNewLines = matches.some((m) => !m.base);
+      const matchedIds = new Set(
+        matches.filter((m) => m.base).map((m) => m.base!.id),
+      );
+      const droppedAny = segments.some((s) => !matchedIds.has(s.id));
+      if (hasNewLines || droppedAny) {
+        setSegments((prev) => {
+          let nextId = prev.length ? Math.max(...prev.map((p) => p.id)) + 1 : 1;
+          let carryEnd = prev[0]?.start ?? 0;
+          const usedIds = new Set<number>();
+          const out: Segment[] = [];
+          const remathches = matchSegments(prev);
+          for (let i = 0; i < remathches.length; i++) {
+            const { p, base } = remathches[i];
+            if (base) {
+              usedIds.add(base.id);
+              carryEnd = base.end;
+              out.push(base);
+            } else {
+              const nextTimed = parsed
+                .slice(i + 1)
+                .find((item) => item.start != null)?.start;
+              const start = p.start ?? carryEnd;
+              const end = Math.max(
+                start + 0.5,
+                nextTimed != null && nextTimed > start ? nextTimed : start + 2,
+              );
+              carryEnd = end;
+              const id = nextId++;
+              // Store typed Latin text as override for the new segment.
+              setFrenchOverrides((prevMap) => {
+                const m = new Map(prevMap);
+                m.set(id, p.text);
+                return m;
+              });
+              out.push({ id, start, end, text: p.text, words: undefined });
+            }
+          }
+          return out;
+        });
+      }
+      setEditingFull(false);
+      return;
+    }
+
+    // Arabic mode: edits update the source text on each segment.
+    setSegments((prev) => {
+      if (prev.length === 0) return prev;
+      let nextId = Math.max(...prev.map((p) => p.id)) + 1;
+      let carryEnd = prev[0].start;
+      const remathches = matchSegments(prev);
+      return remathches.map(({ p, base }, i) => {
         if (base) {
           carryEnd = base.end;
           return { ...base, text: p.text, words: undefined };
         }
-
         const nextTimed = parsed.slice(i + 1).find((item) => item.start != null)?.start;
         const start = p.start ?? carryEnd;
         const end = Math.max(
@@ -287,21 +373,21 @@ function Home() {
   // Live transcript derived from current segments — reflects all edits.
   const liveTranscript =
     segments
-      .map((s) => s.text)
+      .map((s) => displayFor(s))
       .join(" ")
-      .trim() || transcript;
+      .trim() || (script === "french" ? frenchOf(transcript) : transcript);
 
   const base = file ? file.name.replace(/\.[^.]+$/, "") : "transcript";
 
   const scriptedSegments = (): Segment[] =>
     segments.map((s) => ({
       ...s,
-      text: frenchOf(s.text),
+      text: displayFor(s),
       words: s.words?.map((w) => ({ ...w, text: frenchOf(w.text) })),
     }));
 
   const exportTxt = () =>
-    downloadFile(`${base}.txt`, frenchOf(liveTranscript), "text/plain;charset=utf-8");
+    downloadFile(`${base}.txt`, liveTranscript, "text/plain;charset=utf-8");
   const exportSrt = () => {
     const segs = scriptedSegments();
     downloadFile(
@@ -553,38 +639,54 @@ function Home() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setEditingFull(false)}
-                      className="rounded-lg bg-secondary px-3 py-1 text-xs hover:bg-secondary/80"
+                      className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium hover:bg-secondary/80"
                     >
-                      Cancel
+                      Cancel editing
                     </button>
                     <button
                       onClick={saveFullTranscript}
-                      className="rounded-lg bg-primary px-3 py-1 text-xs text-primary-foreground hover:opacity-90"
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
                     >
-                      Save
+                      Save changes
                     </button>
                   </div>
                 )}
               </div>
               {editingFull ? (
                 <>
+                  <div className="mb-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-foreground">
+                    <p className="font-semibold text-primary">How to edit</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed">
+                      <li>
+                        Edit the words freely — the{" "}
+                        <code className="rounded bg-secondary/60 px-1 font-mono">[mm:ss.mmm]</code>{" "}
+                        at the start of each line keeps the timing locked to the video.
+                      </li>
+                      <li>Add or remove whole lines to insert / delete segments.</li>
+                      <li>
+                        Click <span className="font-semibold">Save changes</span> when you&apos;re
+                        done, or <span className="font-semibold">Cancel editing</span> to discard.
+                      </li>
+                    </ul>
+                  </div>
                   <textarea
                     value={draftFull}
                     onChange={(e) => setDraftFull(e.target.value)}
                     dir={script === "arabic" ? "rtl" : "ltr"}
-                    rows={Math.min(16, Math.max(4, Math.ceil(draftFull.length / 60)))}
-                    className={`w-full resize-y rounded-md border border-border bg-background/60 p-3 text-base leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary/40 ${script === "arabic" ? "text-right" : "text-left"}`}
+                    rows={Math.min(20, Math.max(8, draftFull.split("\n").length + 1))}
+                    className={`w-full resize-y rounded-xl border-2 border-primary/30 bg-background p-4 text-base leading-loose focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${script === "arabic" ? "text-right" : "text-left"}`}
                     style={
                       script === "arabic"
                         ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
                         : undefined
                     }
                   />
-                  <p className="mt-2 text-xs text-muted-foreground/70">
-                    Keep the <code className="rounded bg-secondary/60 px-1">[mm:ss]</code> at the
-                    start of each line to preserve timestamps.
-                  </p>
                 </>
+              ) : script === "french" && translitLoading ? (
+                <div className="flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-6 text-sm text-primary">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Please wait — converting Derja to French script…
+                </div>
               ) : (
                 <p
                   dir={script === "arabic" ? "rtl" : "ltr"}
@@ -595,7 +697,7 @@ function Home() {
                       : undefined
                   }
                 >
-                  {frenchOf(liveTranscript)}
+                  {liveTranscript}
                 </p>
               )}
             </div>
@@ -609,29 +711,31 @@ function Home() {
                   Click any line to edit · changes save automatically
                 </span>
               </div>
-              <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-2">
-                {segments.map((s) => {
-                  const captionWords = exportMode === "word" ? segmentToWordCues(s) : [];
-                  const displayText = frenchOf(s.text);
-                  return (
-                    <div key={s.id} className="group/row space-y-1">
-                      <div className="flex items-start gap-2 rounded-xl bg-secondary/40 p-3 transition-colors hover:bg-secondary/70">
-                        <span className="mt-1 shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
-                          {fmtTime(s.start)}
-                        </span>
-                        <div className="flex flex-1 flex-col gap-1.5">
-                          <textarea
-                            value={displayText}
-                            onChange={(e) => {
-                              // In French view, editing replaces the Arabic source with the
-                              // typed Latin text so exports match what the user sees.
-                              updateSegmentText(s.id, e.target.value);
-                            }}
-                            dir={script === "arabic" ? "rtl" : "ltr"}
-                            rows={Math.min(6, Math.max(1, Math.ceil(displayText.length / 50)))}
-                            className={`w-full resize-none rounded-md bg-transparent text-sm leading-relaxed focus:bg-background/60 focus:outline-none focus:ring-1 focus:ring-primary/40 ${
-                              script === "arabic" ? "text-right" : "text-left"
-                            }`}
+              {script === "french" && translitLoading ? (
+                <div className="flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-6 text-sm text-primary">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Please wait — converting Derja to French script…
+                </div>
+              ) : (
+                <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-2">
+                  {segments.map((s) => {
+                    const captionWords = exportMode === "word" ? segmentToWordCues(s) : [];
+                    const displayText = displayFor(s);
+                    return (
+                      <div key={s.id} className="group/row space-y-1">
+                        <div className="flex items-start gap-2 rounded-xl bg-secondary/40 p-3 transition-colors hover:bg-secondary/70">
+                          <span className="mt-1 shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
+                            {fmtTime(s.start)}
+                          </span>
+                          <div className="flex flex-1 flex-col gap-1.5">
+                            <textarea
+                              value={displayText}
+                              onChange={(e) => updateSegmentDisplay(s.id, e.target.value)}
+                              dir={script === "arabic" ? "rtl" : "ltr"}
+                              rows={Math.min(6, Math.max(1, Math.ceil(displayText.length / 50)))}
+                              className={`w-full resize-none rounded-md bg-transparent text-sm leading-relaxed focus:bg-background/60 focus:outline-none focus:ring-1 focus:ring-primary/40 ${
+                                script === "arabic" ? "text-right" : "text-left"
+                              }`}
                             style={
                               script === "arabic"
                                 ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
@@ -674,8 +778,9 @@ function Home() {
                       </div>
                     </div>
                   );
-                })}
-              </div>
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-2">
