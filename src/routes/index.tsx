@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
 import { Upload, FileVideo, Loader2, Download, X, Languages, Clock } from "lucide-react";
-import { toSrt, toVtt, fmtTime, downloadFile, type Segment } from "@/lib/subtitles";
+import { toSrt, toVtt, toWordSrt, toWordVtt, fmtTime, downloadFile, type Segment, type Word } from "@/lib/subtitles";
 import { transcribeFile, type RateInfo } from "@/lib/transcribe";
 
 export const Route = createFileRoute("/")({
@@ -30,6 +30,7 @@ function Home() {
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>("");
   const [segments, setSegments] = useState<Segment[]>([]);
+  const [words, setWords] = useState<Word[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -52,6 +53,7 @@ function Home() {
     setFile(f);
     setTranscript("");
     setSegments([]);
+    setWords([]);
     setStatus("idle");
   };
 
@@ -76,6 +78,7 @@ function Home() {
 
       setTranscript(result.text);
       setSegments(result.segments);
+      setWords(result.words);
       if (result.rate) setRate(result.rate);
       setStatus("done");
     } catch (e) {
@@ -89,6 +92,7 @@ function Home() {
     setFile(null);
     setTranscript("");
     setSegments([]);
+    setWords([]);
     setStatus("idle");
     setError(null);
   };
@@ -97,9 +101,9 @@ function Home() {
 
   const exportTxt = () => downloadFile(`${base}.txt`, transcript, "text/plain;charset=utf-8");
   const exportSrt = () =>
-    downloadFile(`${base}.srt`, toSrt(segments), "application/x-subrip;charset=utf-8");
+    downloadFile(`${base}.srt`, words.length ? toWordSrt(words) : toSrt(segments), "application/x-subrip;charset=utf-8");
   const exportVtt = () =>
-    downloadFile(`${base}.vtt`, toVtt(segments), "text/vtt;charset=utf-8");
+    downloadFile(`${base}.vtt`, words.length ? toWordVtt(words) : toVtt(segments), "text/vtt;charset=utf-8");
 
   const busy = status === "extracting" || status === "uploading" || status === "transcribing";
 
