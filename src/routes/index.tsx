@@ -60,7 +60,7 @@ function Home() {
   const [transcript, setTranscript] = useState<string>("");
   const [segments, setSegments] = useState<Segment[]>([]);
   const [dragOver, setDragOver] = useState(false);
-  const [exportMode, setExportMode] = useState<"word" | "line">("word");
+  const [exportMode, setExportMode] = useState<"word" | "line">("line");
   const [script, setScript] = useState<"arabic" | "french">("arabic");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -201,8 +201,17 @@ function Home() {
   const [editingFull, setEditingFull] = useState(false);
   const [draftFull, setDraftFull] = useState("");
 
-  // Format used in the bulk editor: "[mm:ss] text" per line. The timestamp
-  // prefix is preserved on save so chips never go blank.
+  const fmtExactTime = (t: number) => {
+    const totalMs = Math.max(0, Math.round(t * 1000));
+    const m = Math.floor(totalMs / 60_000);
+    const s = Math.floor((totalMs % 60_000) / 1000);
+    const ms = totalMs % 1000;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
+  };
+
+  // Format used in the bulk editor: "[mm:ss.mmm] text" per line. On save,
+  // existing rows are matched back to their original segment start so normal
+  // text edits never rewrite video timing.
   const parseTimePrefix = (line: string): { start: number | null; text: string } => {
     const m = line.match(/^\s*\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)$/);
     if (!m) return { start: null, text: line.trim() };
@@ -213,7 +222,7 @@ function Home() {
   };
 
   const buildDraft = () =>
-    segments.map((s) => `[${fmtTime(s.start)}] ${frenchOf(s.text)}`).join("\n");
+    segments.map((s) => `[${fmtExactTime(s.start)}] ${frenchOf(s.text)}`).join("\n");
 
   const saveFullTranscript = () => {
     const rawLines = draftFull.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
@@ -224,31 +233,48 @@ function Home() {
     const parsed = rawLines.map(parseTimePrefix);
     setSegments((prev) => {
       if (prev.length === 0) return prev;
-      const lastEnd = prev[prev.length - 1].end;
       let nextId = Math.max(...prev.map((p) => p.id)) + 1;
+      const used = new Set<number>();
+      let carryEnd = prev[0].start;
+
+      const takeMatchingSegment = (start: number | null, fallbackIndex: number) => {
+        if (start != null) {
+          let bestIndex = -1;
+          let bestDiff = Infinity;
+          for (let i = 0; i < prev.length; i++) {
+            if (used.has(i)) continue;
+            const diff = Math.abs(prev[i].start - start);
+            if (diff < bestDiff) {
+              bestDiff = diff;
+              bestIndex = i;
+            }
+          }
+          if (bestIndex !== -1 && bestDiff <= 0.05) {
+            used.add(bestIndex);
+            return prev[bestIndex];
+          }
+        }
+
+        if (prev[fallbackIndex] && !used.has(fallbackIndex) && start == null) {
+          used.add(fallbackIndex);
+          return prev[fallbackIndex];
+        }
+
+        return null;
+      };
+
       return parsed.map((p, i) => {
-        const base = prev[i];
-        const start = p.start != null ? p.start : (base ? base.start : (parsed[i - 1]?.start ?? 0) + 1);
-        // End: keep original if available, else next line's start, else +2s.
-        const nextStart =
-          parsed[i + 1]?.start ?? (prev[i + 1]?.start) ?? (base ? base.end : start + 2);
-        const end = base ? Math.max(start + 0.1, base.end) : Math.max(start + 0.5, nextStart);
-        return {
-          id: base ? base.id : nextId++,
-          start,
-          end: i === parsed.length - 1 && base ? base.end : Math.max(start + 0.1, end),
-          text: p.text,
-          words: undefined,
-        };
-      }).map((s, i, arr) => {
-        // Ensure monotonic timestamps & non-overlapping ends.
-        if (i < arr.length - 1 && s.end > arr[i + 1].start) {
-          return { ...s, end: Math.max(s.start + 0.1, arr[i + 1].start) };
+        const base = takeMatchingSegment(p.start, i);
+        if (base) {
+          carryEnd = base.end;
+          return { ...base, text: p.text, words: undefined };
         }
-        if (i === arr.length - 1) {
-          return { ...s, end: Math.max(s.start + 0.5, lastEnd) };
-        }
-        return s;
+
+        const nextTimed = parsed.slice(i + 1).find((item) => item.start != null)?.start;
+        const start = p.start ?? carryEnd;
+        const end = Math.max(start + 0.5, nextTimed != null && nextTimed > start ? nextTimed : start + 2);
+        carryEnd = end;
+        return { id: nextId++, start, end, text: p.text, words: undefined };
       });
     });
     setEditingFull(false);
