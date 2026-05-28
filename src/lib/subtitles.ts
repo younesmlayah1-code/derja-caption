@@ -6,11 +6,11 @@ function pad(n: number, len = 2) {
 }
 
 function fmtSrt(t: number) {
-  const safe = Math.max(0, t);
-  const h = Math.floor(safe / 3600);
-  const m = Math.floor((safe % 3600) / 60);
-  const s = Math.floor(safe % 60);
-  const ms = Math.round((safe - Math.floor(safe)) * 1000);
+  const totalMs = Math.max(0, Math.round(t * 1000));
+  const h = Math.floor(totalMs / 3_600_000);
+  const m = Math.floor((totalMs % 3_600_000) / 60_000);
+  const s = Math.floor((totalMs % 60_000) / 1000);
+  const ms = totalMs % 1000;
   return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`;
 }
 
@@ -19,7 +19,9 @@ function fmtVtt(t: number) {
 }
 
 function flattenWords(segments: Segment[], words?: Word[]): Word[] {
-  if (words && words.length > 0) return words.filter((w) => w.text).sort((a, b) => a.start - b.start);
+  if (words && words.length > 0) {
+    return words.filter((w) => w.text).sort((a, b) => a.start - b.start);
+  }
   const out: { start: number; end: number; text: string }[] = [];
   for (const s of segments) {
     if (s.words && s.words.length > 0) {
