@@ -100,16 +100,28 @@ async function transliterateChunk(items: Item[], key: string): Promise<Item[]> {
   const byId = new Map<string, string>();
   for (const it of arr) {
     if (it && (typeof it.id === "number" || typeof it.id === "string") && typeof it.text === "string") {
-      byId.set(String(it.id), stripHyphens(it.text));
+      byId.set(String(it.id), finalize(it.text));
     }
   }
-  return items.map((it) => ({ id: it.id, text: byId.get(String(it.id)) ?? it.text }));
+  return items.map((it) => ({
+    id: it.id,
+    text: byId.get(String(it.id)) ?? finalize(it.text),
+  }));
+}
+
+// Final cleanup: strip intra-word hyphens AND guarantee no Arabic characters
+// remain (rule-based fallback for any word the AI left in Arabic script).
+function finalize(text: string): string {
+  const noArabic = text
+    .split(/(\s+)/)
+    .map((seg) => (/[\u0600-\u06FF]/.test(seg) ? transliterateDerja(seg) : seg))
+    .join("");
+  return stripHyphens(noArabic);
 }
 
 // Remove hyphens inserted between Latin letters / digits within a single word
-// (e.g. "en-nes" → "ennes", "ett-ab3a" → "ettab3a"). Keeps real hyphenated
-// French words intact only when both sides include a vowel-rich pattern is
-// hard to detect, so we simply collapse all intra-word hyphens.
+// (e.g. "en-nes" → "ennes", "ett-ab3a" → "ettab3a").
 function stripHyphens(text: string): string {
   return text.replace(/([A-Za-z0-9'])-+([A-Za-z0-9'])/g, "$1$2");
 }
+
