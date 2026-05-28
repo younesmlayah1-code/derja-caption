@@ -117,13 +117,13 @@ function Home() {
   const exportSrt = () =>
     downloadFile(
       `${base}.srt`,
-      segments.length ? toWordSrtFromSegments(segments) : toSrt(segments),
+      segments.length && exportMode === "word" ? toWordSrtFromSegments(segments) : toSrt(segments),
       "application/x-subrip;charset=utf-8",
     );
   const exportVtt = () =>
     downloadFile(
       `${base}.vtt`,
-      segments.length ? toWordVttFromSegments(segments) : toVtt(segments),
+      segments.length && exportMode === "word" ? toWordVttFromSegments(segments) : toVtt(segments),
       "text/vtt;charset=utf-8",
     );
 
