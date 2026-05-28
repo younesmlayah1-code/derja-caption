@@ -202,33 +202,42 @@ function Home() {
   const [draftFull, setDraftFull] = useState("");
 
   const saveFullTranscript = () => {
-    const newWords = draftFull.trim().split(/\s+/).filter(Boolean);
-    if (segments.length === 0) {
+    const lines = draftFull.split(/\r?\n/).map((l) => l.trim());
+    // Drop trailing empty lines but keep internal blanks as empty segments? No—drop all empties.
+    const cleaned = lines.filter((l) => l.length > 0);
+    if (cleaned.length === 0) {
       setEditingFull(false);
       return;
     }
-    const counts = segments.map(
-      (s) => s.text.trim().split(/\s+/).filter(Boolean).length || 1,
-    );
-    const total = counts.reduce((a, b) => a + b, 0);
-    let idx = 0;
-    const allocations = counts.map((c, i) => {
-      if (i === counts.length - 1) return Math.max(0, newWords.length - idx);
-      const n = Math.max(0, Math.round((newWords.length * c) / total));
-      idx += n;
-      return n;
+    setSegments((prev) => {
+      if (prev.length === 0) return prev;
+      const out = prev.slice(0, Math.min(prev.length, cleaned.length)).map((s, i) => ({
+        ...s,
+        text: cleaned[i],
+        words: undefined,
+      }));
+      // If more lines than segments, append extras using last segment's timing as base.
+      if (cleaned.length > prev.length) {
+        const last = prev[prev.length - 1];
+        const dur = Math.max(1, last.end - last.start);
+        let cursor = last.end;
+        let nextId = Math.max(...prev.map((p) => p.id)) + 1;
+        for (let i = prev.length; i < cleaned.length; i++) {
+          out.push({
+            id: nextId++,
+            start: cursor,
+            end: cursor + dur,
+            text: cleaned[i],
+            words: [],
+          });
+          cursor += dur;
+        }
+      }
+      return out;
     });
-    idx = 0;
-    setSegments((prev) =>
-      prev.map((s, i) => {
-        const take = allocations[i];
-        const slice = newWords.slice(idx, idx + take).join(" ");
-        idx += take;
-        return { ...s, text: slice, words: undefined };
-      }),
-    );
     setEditingFull(false);
   };
+
 
 
   // Live transcript derived from current segments — reflects all edits.
