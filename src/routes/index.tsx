@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Upload,
   FileVideo,
@@ -17,7 +17,6 @@ import {
   toWordSrtFromSegments,
   toWordVttFromSegments,
   segmentToWordCues,
-  applyScript,
   fmtTime,
   downloadFile,
   type Segment,
@@ -82,6 +81,7 @@ function Home() {
     setFile(f);
     setTranscript("");
     setSegments([]);
+    setFrenchMap(new Map());
     setStatus("idle");
   };
 
@@ -106,6 +106,7 @@ function Home() {
 
       setTranscript(result.text);
       setSegments(result.segments);
+      setFrenchMap(new Map());
       if (result.rate) setRate(result.rate);
       setStatus("done");
     } catch (e) {
@@ -119,21 +120,69 @@ function Home() {
     setFile(null);
     setTranscript("");
     setSegments([]);
+    setFrenchMap(new Map());
     setStatus("idle");
     setError(null);
   };
+
+  const [frenchMap, setFrenchMap] = useState<Map<string, string>>(new Map());
+  const [translitLoading, setTranslitLoading] = useState(false);
+
+  useEffect(() => {
+    if (script !== "french" || segments.length === 0) return;
+    const texts = new Set<string>();
+    if (transcript) texts.add(transcript);
+    for (const s of segments) {
+      if (s.text) texts.add(s.text);
+      for (const w of s.words ?? []) if (w.text) texts.add(w.text);
+    }
+    const missing = [...texts].filter((t) => !frenchMap.has(t));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    setTranslitLoading(true);
+    (async () => {
+      try {
+        const res = await fetch("/api/transliterate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: missing.map((t, i) => ({ id: i, text: t })) }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const j = (await res.json()) as { items?: Array<{ id: number; text: string }> };
+        if (cancelled) return;
+        setFrenchMap((prev) => {
+          const next = new Map(prev);
+          for (const it of j.items ?? []) {
+            const orig = missing[it.id];
+            if (orig != null && typeof it.text === "string") next.set(orig, it.text);
+          }
+          return next;
+        });
+      } catch (e) {
+        console.error("transliteration failed:", e);
+      } finally {
+        if (!cancelled) setTranslitLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [script, segments, transcript, frenchMap]);
+
+  const frenchOf = (t: string) => (script === "french" ? (frenchMap.get(t) ?? t) : t);
 
   const base = file ? file.name.replace(/\.[^.]+$/, "") : "transcript";
 
   const scriptedSegments = (): Segment[] =>
     segments.map((s) => ({
       ...s,
-      text: applyScript(s.text, script),
-      words: s.words?.map((w) => ({ ...w, text: applyScript(w.text, script) })),
+      text: frenchOf(s.text),
+      words: s.words?.map((w) => ({ ...w, text: frenchOf(w.text) })),
     }));
 
   const exportTxt = () =>
-    downloadFile(`${base}.txt`, applyScript(transcript, script), "text/plain;charset=utf-8");
+    downloadFile(`${base}.txt`, frenchOf(transcript), "text/plain;charset=utf-8");
   const exportSrt = () => {
     const segs = scriptedSegments();
     downloadFile(
@@ -187,7 +236,8 @@ function Home() {
           </div>
         )}
 
-        {!segments.length && (
+        {(
+
           <div className="mx-auto mb-5 max-w-sm space-y-2">
             <div className="flex items-center justify-center gap-1 rounded-xl border border-border bg-card/40 p-1 backdrop-blur">
               <button
@@ -232,6 +282,9 @@ function Home() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
+                {translitLoading && script === "french" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : null}
                 Derja · French
               </button>
             </div>
@@ -379,7 +432,7 @@ function Home() {
                     : undefined
                 }
               >
-                {applyScript(transcript, script)}
+                {frenchOf(transcript)}
               </p>
             </div>
 
@@ -414,14 +467,14 @@ function Home() {
                               title={`${fmtTime(w.start)} – ${fmtTime(w.end)}`}
                               className="group inline-flex flex-col items-center rounded-md px-1.5 py-0.5 hover:bg-primary/15"
                             >
-                              <span>{applyScript(w.text, script)}</span>
+                              <span>{frenchOf(w.text)}</span>
                               <span className="font-mono text-[10px] text-muted-foreground/70">
                                 {fmtTime(w.start)}
                               </span>
                             </span>
                           ))
                         ) : (
-                          <span>{applyScript(s.text, script)}</span>
+                          <span>{frenchOf(s.text)}</span>
                         )}
                       </div>
                     </div>
