@@ -175,9 +175,7 @@ function Home() {
   const frenchOf = (t: string) => (script === "french" ? (frenchMap.get(t) ?? t) : t);
 
   const updateSegmentText = (id: number, text: string) => {
-    setSegments((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, text, words: undefined } : s)),
-    );
+    setSegments((prev) => prev.map((s) => (s.id === id ? { ...s, text, words: undefined } : s)));
   };
 
   const deleteSegment = (id: number) => {
@@ -225,7 +223,10 @@ function Home() {
     segments.map((s) => `[${fmtExactTime(s.start)}] ${frenchOf(s.text)}`).join("\n");
 
   const saveFullTranscript = () => {
-    const rawLines = draftFull.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+    const rawLines = draftFull
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
     if (rawLines.length === 0) {
       setEditingFull(false);
       return;
@@ -272,7 +273,10 @@ function Home() {
 
         const nextTimed = parsed.slice(i + 1).find((item) => item.start != null)?.start;
         const start = p.start ?? carryEnd;
-        const end = Math.max(start + 0.5, nextTimed != null && nextTimed > start ? nextTimed : start + 2);
+        const end = Math.max(
+          start + 0.5,
+          nextTimed != null && nextTimed > start ? nextTimed : start + 2,
+        );
         carryEnd = end;
         return { id: nextId++, start, end, text: p.text, words: undefined };
       });
@@ -280,11 +284,12 @@ function Home() {
     setEditingFull(false);
   };
 
-
-
-
   // Live transcript derived from current segments — reflects all edits.
-  const liveTranscript = segments.map((s) => s.text).join(" ").trim() || transcript;
+  const liveTranscript =
+    segments
+      .map((s) => s.text)
+      .join(" ")
+      .trim() || transcript;
 
   const base = file ? file.name.replace(/\.[^.]+$/, "") : "transcript";
 
@@ -350,8 +355,7 @@ function Home() {
           </div>
         )}
 
-        {(
-
+        {
           <div className="mx-auto mb-5 max-w-sm space-y-2">
             <div className="flex items-center justify-center gap-1 rounded-xl border border-border bg-card/40 p-1 backdrop-blur">
               <button
@@ -396,14 +400,11 @@ function Home() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {translitLoading && script === "french"
-                  ? "Please wait…"
-                  : "Derja · French"}
-
+                {translitLoading && script === "french" ? "Please wait…" : "Derja · French"}
               </button>
             </div>
           </div>
-        )}
+        }
 
         {!segments.length && (
           <section
@@ -580,7 +581,8 @@ function Home() {
                     }
                   />
                   <p className="mt-2 text-xs text-muted-foreground/70">
-                    Keep the <code className="rounded bg-secondary/60 px-1">[mm:ss]</code> at the start of each line to preserve timestamps.
+                    Keep the <code className="rounded bg-secondary/60 px-1">[mm:ss]</code> at the
+                    start of each line to preserve timestamps.
                   </p>
                 </>
               ) : (
@@ -596,9 +598,7 @@ function Home() {
                   {frenchOf(liveTranscript)}
                 </p>
               )}
-
             </div>
-
 
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
               <div className="mb-3 flex items-center justify-between">
@@ -677,10 +677,6 @@ function Home() {
                 })}
               </div>
             </div>
-
-
-
-
 
             <div className="grid grid-cols-3 gap-2">
               {[
