@@ -188,20 +188,6 @@ function Home() {
         )}
 
         {!segments.length && (
-          <div className="mx-auto mb-5 flex max-w-sm items-center justify-center gap-1 rounded-xl border border-border bg-card/40 p-1 backdrop-blur">
-            <button
-              onClick={() => setExportMode("line")}
-              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                exportMode === "line"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <AlignLeft className="h-4 w-4" />
-              Line per line
-            </button>
-            <button
-        {!segments.length && (
           <div className="mx-auto mb-5 max-w-sm space-y-2">
             <div className="flex items-center justify-center gap-1 rounded-xl border border-border bg-card/40 p-1 backdrop-blur">
               <button
@@ -251,6 +237,20 @@ function Home() {
             </div>
           </div>
         )}
+
+        {!segments.length && (
+          <section
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              const f = e.dataTransfer.files?.[0];
+              if (f) handleFile(f);
+            }}
             className={`relative rounded-3xl border-2 border-dashed bg-card/30 p-8 backdrop-blur transition-all md:p-12 ${
               dragOver ? "border-primary bg-primary/5 glow" : "border-border"
             }`}
