@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
 import { Upload, FileVideo, Loader2, Download, X, Languages, Clock } from "lucide-react";
-import { toSrt, toVtt, toWordSrt, toWordVtt, fmtTime, downloadFile, type Segment, type Word } from "@/lib/subtitles";
+import {
+  toSrt,
+  toVtt,
+  toWordSrt,
+  toWordVtt,
+  fmtTime,
+  downloadFile,
+  type Segment,
+  type Word,
+} from "@/lib/subtitles";
 import { transcribeFile, type RateInfo } from "@/lib/transcribe";
 
 export const Route = createFileRoute("/")({
@@ -18,7 +27,15 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-const ACCEPTED = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/webm", "audio/mpeg", "audio/wav", "audio/mp4"];
+const ACCEPTED = [
+  "video/mp4",
+  "video/quicktime",
+  "video/x-msvideo",
+  "video/webm",
+  "audio/mpeg",
+  "audio/wav",
+  "audio/mp4",
+];
 const ACCEPTED_EXT = [".mp4", ".mov", ".avi", ".webm", ".mp3", ".wav", ".m4a"];
 const MAX_BYTES = 500 * 1024 * 1024;
 
@@ -101,9 +118,17 @@ function Home() {
 
   const exportTxt = () => downloadFile(`${base}.txt`, transcript, "text/plain;charset=utf-8");
   const exportSrt = () =>
-    downloadFile(`${base}.srt`, words.length ? toWordSrt(words) : toSrt(segments), "application/x-subrip;charset=utf-8");
+    downloadFile(
+      `${base}.srt`,
+      words.length ? toWordSrt(words) : toSrt(segments),
+      "application/x-subrip;charset=utf-8",
+    );
   const exportVtt = () =>
-    downloadFile(`${base}.vtt`, words.length ? toWordVtt(words) : toVtt(segments), "text/vtt;charset=utf-8");
+    downloadFile(
+      `${base}.vtt`,
+      words.length ? toWordVtt(words) : toVtt(segments),
+      "text/vtt;charset=utf-8",
+    );
 
   const busy = status === "extracting" || status === "uploading" || status === "transcribing";
 
