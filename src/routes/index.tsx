@@ -311,36 +311,36 @@ function Home() {
                 {segments.map((s) => {
                   const captionWords = segmentToWordCues(s);
                   return (
-                  <div
-                    key={s.id}
-                    className="flex gap-3 rounded-xl bg-secondary/40 p-3 transition-colors hover:bg-secondary/70"
-                  >
-                    <span className="shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
-                      {fmtTime(s.start)}
-                    </span>
                     <div
-                      dir="rtl"
-                      className="flex flex-1 flex-wrap justify-end gap-1.5 text-right text-sm leading-relaxed"
-                      style={{ fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }}
+                      key={s.id}
+                      className="flex gap-3 rounded-xl bg-secondary/40 p-3 transition-colors hover:bg-secondary/70"
                     >
-                      {captionWords.length > 0 ? (
-                        captionWords.map((w, i) => (
-                          <span
-                            key={i}
-                            title={`${fmtTime(w.start)} – ${fmtTime(w.end)}`}
-                            className="group inline-flex flex-col items-center rounded-md px-1.5 py-0.5 hover:bg-primary/15"
-                          >
-                            <span>{w.text}</span>
-                            <span className="font-mono text-[10px] text-muted-foreground/70">
-                              {fmtTime(w.start)}
+                      <span className="shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
+                        {fmtTime(s.start)}
+                      </span>
+                      <div
+                        dir="rtl"
+                        className="flex flex-1 flex-wrap justify-end gap-1.5 text-right text-sm leading-relaxed"
+                        style={{ fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }}
+                      >
+                        {captionWords.length > 0 ? (
+                          captionWords.map((w, i) => (
+                            <span
+                              key={i}
+                              title={`${fmtTime(w.start)} – ${fmtTime(w.end)}`}
+                              className="group inline-flex flex-col items-center rounded-md px-1.5 py-0.5 hover:bg-primary/15"
+                            >
+                              <span>{w.text}</span>
+                              <span className="font-mono text-[10px] text-muted-foreground/70">
+                                {fmtTime(w.start)}
+                              </span>
                             </span>
-                          </span>
-                        ))
-                      ) : (
-                        <span>{s.text}</span>
-                      )}
+                          ))
+                        ) : (
+                          <span>{s.text}</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
                   );
                 })}
               </div>
