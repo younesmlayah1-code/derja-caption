@@ -10,6 +10,8 @@ import {
   Clock,
   AlignLeft,
   AlignJustify,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import {
   toSrt,
@@ -172,6 +174,33 @@ function Home() {
 
   const frenchOf = (t: string) => (script === "french" ? (frenchMap.get(t) ?? t) : t);
 
+  const updateSegmentText = (id: number, text: string) => {
+    setSegments((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, text, words: undefined } : s)),
+    );
+  };
+
+  const deleteSegment = (id: number) => {
+    setSegments((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const addSegmentAfter = (id: number) => {
+    setSegments((prev) => {
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx === -1) return prev;
+      const cur = prev[idx];
+      const nextSeg = prev[idx + 1];
+      const newStart = cur.end;
+      const newEnd = nextSeg ? Math.min(nextSeg.start, cur.end + 2) : cur.end + 2;
+      const newId = (prev.length ? Math.max(...prev.map((p) => p.id)) : 0) + 1;
+      const newSeg: Segment = { id: newId, start: newStart, end: newEnd, text: "", words: [] };
+      return [...prev.slice(0, idx + 1), newSeg, ...prev.slice(idx + 1)];
+    });
+  };
+
+  // Live transcript derived from current segments — reflects all edits.
+  const liveTranscript = segments.map((s) => s.text).join(" ").trim() || transcript;
+
   const base = file ? file.name.replace(/\.[^.]+$/, "") : "transcript";
 
   const scriptedSegments = (): Segment[] =>
@@ -182,7 +211,7 @@ function Home() {
     }));
 
   const exportTxt = () =>
-    downloadFile(`${base}.txt`, frenchOf(transcript), "text/plain;charset=utf-8");
+    downloadFile(`${base}.txt`, frenchOf(liveTranscript), "text/plain;charset=utf-8");
   const exportSrt = () => {
     const segs = scriptedSegments();
     downloadFile(
@@ -432,56 +461,89 @@ function Home() {
                     : undefined
                 }
               >
-                {frenchOf(transcript)}
+                {frenchOf(liveTranscript)}
               </p>
             </div>
 
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
-              <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
-                Timestamped captions
-              </h3>
-              <div className="max-h-96 space-y-2 overflow-y-auto pr-2">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-muted-foreground">
+                  Timestamped captions
+                </h3>
+                <span className="text-xs text-muted-foreground/70">
+                  Click any line to edit · changes save automatically
+                </span>
+              </div>
+              <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-2">
                 {segments.map((s) => {
                   const captionWords = exportMode === "word" ? segmentToWordCues(s) : [];
+                  const displayText = frenchOf(s.text);
                   return (
-                    <div
-                      key={s.id}
-                      className="flex gap-3 rounded-xl bg-secondary/40 p-3 transition-colors hover:bg-secondary/70"
-                    >
-                      <span className="shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
-                        {fmtTime(s.start)}
-                      </span>
-                      <div
-                        dir={script === "arabic" ? "rtl" : "ltr"}
-                        className={`flex flex-1 flex-wrap gap-1.5 text-sm leading-relaxed ${script === "arabic" ? "justify-end text-right" : "justify-start text-left"}`}
-                        style={
-                          script === "arabic"
-                            ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
-                            : undefined
-                        }
-                      >
-                        {captionWords.length > 0 ? (
-                          captionWords.map((w, i) => (
-                            <span
-                              key={i}
-                              title={`${fmtTime(w.start)} – ${fmtTime(w.end)}`}
-                              className="group inline-flex flex-col items-center rounded-md px-1.5 py-0.5 hover:bg-primary/15"
+                    <div key={s.id} className="group/row space-y-1">
+                      <div className="flex items-start gap-2 rounded-xl bg-secondary/40 p-3 transition-colors hover:bg-secondary/70">
+                        <span className="mt-1 shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
+                          {fmtTime(s.start)}
+                        </span>
+                        <div className="flex flex-1 flex-col gap-1.5">
+                          <textarea
+                            value={displayText}
+                            onChange={(e) => {
+                              // In French view, editing replaces the Arabic source with the
+                              // typed Latin text so exports match what the user sees.
+                              updateSegmentText(s.id, e.target.value);
+                            }}
+                            dir={script === "arabic" ? "rtl" : "ltr"}
+                            rows={Math.min(6, Math.max(1, Math.ceil(displayText.length / 50)))}
+                            className={`w-full resize-none rounded-md bg-transparent text-sm leading-relaxed focus:bg-background/60 focus:outline-none focus:ring-1 focus:ring-primary/40 ${
+                              script === "arabic" ? "text-right" : "text-left"
+                            }`}
+                            style={
+                              script === "arabic"
+                                ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
+                                : undefined
+                            }
+                          />
+                          {captionWords.length > 0 && (
+                            <div
+                              dir={script === "arabic" ? "rtl" : "ltr"}
+                              className={`flex flex-wrap gap-1 text-[10px] text-muted-foreground/70 ${
+                                script === "arabic" ? "justify-end" : "justify-start"
+                              }`}
                             >
-                              <span>{frenchOf(w.text)}</span>
-                              <span className="font-mono text-[10px] text-muted-foreground/70">
-                                {fmtTime(w.start)}
-                              </span>
-                            </span>
-                          ))
-                        ) : (
-                          <span>{frenchOf(s.text)}</span>
-                        )}
+                              {captionWords.map((w, i) => (
+                                <span key={i} className="font-mono">
+                                  {fmtTime(w.start)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover/row:opacity-100">
+                          <button
+                            onClick={() => addSegmentAfter(s.id)}
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-primary/15 hover:text-primary"
+                            aria-label="Add segment below"
+                            title="Add segment below"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => deleteSegment(s.id)}
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                            aria-label="Delete segment"
+                            title="Delete segment"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
             </div>
+
+
 
 
 
