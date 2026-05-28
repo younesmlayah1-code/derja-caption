@@ -625,64 +625,11 @@ function Home() {
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-muted-foreground">Full transcript</h3>
-                {!editingFull ? (
-                  <button
-                    onClick={() => {
-                      setDraftFull(buildDraft());
-                      setEditingFull(true);
-                    }}
-                    className="rounded-lg bg-secondary px-3 py-1 text-xs hover:bg-secondary/80"
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setEditingFull(false)}
-                      className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium hover:bg-secondary/80"
-                    >
-                      Cancel editing
-                    </button>
-                    <button
-                      onClick={saveFullTranscript}
-                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-                    >
-                      Save changes
-                    </button>
-                  </div>
-                )}
+                <span className="text-xs text-muted-foreground/70">
+                  Edit below in the timestamped captions
+                </span>
               </div>
-              {editingFull ? (
-                <>
-                  <div className="mb-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-foreground">
-                    <p className="font-semibold text-primary">How to edit</p>
-                    <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed">
-                      <li>
-                        Edit the words freely — the{" "}
-                        <code className="rounded bg-secondary/60 px-1 font-mono">[mm:ss.mmm]</code>{" "}
-                        at the start of each line keeps the timing locked to the video.
-                      </li>
-                      <li>Add or remove whole lines to insert / delete segments.</li>
-                      <li>
-                        Click <span className="font-semibold">Save changes</span> when you&apos;re
-                        done, or <span className="font-semibold">Cancel editing</span> to discard.
-                      </li>
-                    </ul>
-                  </div>
-                  <textarea
-                    value={draftFull}
-                    onChange={(e) => setDraftFull(e.target.value)}
-                    dir={script === "arabic" ? "rtl" : "ltr"}
-                    rows={Math.min(20, Math.max(8, draftFull.split("\n").length + 1))}
-                    className={`w-full resize-y rounded-xl border-2 border-primary/30 bg-background p-4 text-base leading-loose focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${script === "arabic" ? "text-right" : "text-left"}`}
-                    style={
-                      script === "arabic"
-                        ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
-                        : undefined
-                    }
-                  />
-                </>
-              ) : script === "french" && translitLoading ? (
+              {script === "french" && translitLoading ? (
                 <div className="flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-6 text-sm text-primary">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Please wait — converting Derja to French script…
@@ -701,6 +648,7 @@ function Home() {
                 </p>
               )}
             </div>
+
 
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
               <div className="mb-3 flex items-center justify-between">
