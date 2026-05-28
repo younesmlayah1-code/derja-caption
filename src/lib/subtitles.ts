@@ -1,4 +1,5 @@
-export type Segment = { id: number; start: number; end: number; text: string };
+export type Word = { start: number; end: number; text: string };
+export type Segment = { id: number; start: number; end: number; text: string; words?: Word[] };
 
 function pad(n: number, len = 2) {
   return n.toString().padStart(len, "0");
