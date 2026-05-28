@@ -228,8 +228,9 @@ function Home() {
             start: cursor,
             end: cursor + dur,
             text: cleaned[i],
-            words: [],
+            words: undefined,
           });
+
           cursor += dur;
         }
       }
