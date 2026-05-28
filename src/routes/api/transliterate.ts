@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { transliterateDerja } from "@/lib/subtitles";
+
 
 type Item = { id: number | string; text: string };
 
