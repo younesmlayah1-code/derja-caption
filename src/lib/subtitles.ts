@@ -17,8 +17,22 @@ function fmtVtt(t: number) {
   return fmtSrt(t).replace(",", ".");
 }
 
+function flattenWords(segments: Segment[]): { start: number; end: number; text: string }[] {
+  const out: { start: number; end: number; text: string }[] = [];
+  for (const s of segments) {
+    if (s.words && s.words.length > 0) {
+      for (const w of s.words) {
+        if (w.text) out.push({ start: w.start, end: w.end, text: w.text });
+      }
+    } else if (s.text) {
+      out.push({ start: s.start, end: s.end, text: s.text });
+    }
+  }
+  return out;
+}
+
 export function toSrt(segments: Segment[]) {
-  return segments
+  return flattenWords(segments)
     .map((s, i) => `${i + 1}\n${fmtSrt(s.start)} --> ${fmtSrt(s.end)}\n${s.text}\n`)
     .join("\n");
 }
@@ -26,7 +40,7 @@ export function toSrt(segments: Segment[]) {
 export function toVtt(segments: Segment[]) {
   return (
     "WEBVTT\n\n" +
-    segments
+    flattenWords(segments)
       .map((s) => `${fmtVtt(s.start)} --> ${fmtVtt(s.end)}\n${s.text}\n`)
       .join("\n")
   );
