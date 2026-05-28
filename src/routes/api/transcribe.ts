@@ -124,7 +124,7 @@ export const Route = createFileRoute("/api/transcribe")({
           remainingRequests: numOrNull(h.get("x-ratelimit-remaining-requests")),
         };
 
-        return Response.json({ text: fullText, segments: polishedSegments, rate });
+        return Response.json({ text: fullText, segments: polishedSegments, words: allWords, rate });
       },
     },
   },
