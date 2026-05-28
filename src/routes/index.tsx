@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Upload,
   FileVideo,
@@ -17,7 +17,6 @@ import {
   toWordSrtFromSegments,
   toWordVttFromSegments,
   segmentToWordCues,
-  applyScript,
   fmtTime,
   downloadFile,
   type Segment,
@@ -82,6 +81,7 @@ function Home() {
     setFile(f);
     setTranscript("");
     setSegments([]);
+    setFrenchMap(new Map());
     setStatus("idle");
   };
 
@@ -106,6 +106,7 @@ function Home() {
 
       setTranscript(result.text);
       setSegments(result.segments);
+      setFrenchMap(new Map());
       if (result.rate) setRate(result.rate);
       setStatus("done");
     } catch (e) {
@@ -119,21 +120,69 @@ function Home() {
     setFile(null);
     setTranscript("");
     setSegments([]);
+    setFrenchMap(new Map());
     setStatus("idle");
     setError(null);
   };
+
+  const [frenchMap, setFrenchMap] = useState<Map<string, string>>(new Map());
+  const [translitLoading, setTranslitLoading] = useState(false);
+
+  useEffect(() => {
+    if (script !== "french" || segments.length === 0) return;
+    const texts = new Set<string>();
+    if (transcript) texts.add(transcript);
+    for (const s of segments) {
+      if (s.text) texts.add(s.text);
+      for (const w of s.words ?? []) if (w.text) texts.add(w.text);
+    }
+    const missing = [...texts].filter((t) => !frenchMap.has(t));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    setTranslitLoading(true);
+    (async () => {
+      try {
+        const res = await fetch("/api/transliterate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: missing.map((t, i) => ({ id: i, text: t })) }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const j = (await res.json()) as { items?: Array<{ id: number; text: string }> };
+        if (cancelled) return;
+        setFrenchMap((prev) => {
+          const next = new Map(prev);
+          for (const it of j.items ?? []) {
+            const orig = missing[it.id];
+            if (orig != null && typeof it.text === "string") next.set(orig, it.text);
+          }
+          return next;
+        });
+      } catch (e) {
+        console.error("transliteration failed:", e);
+      } finally {
+        if (!cancelled) setTranslitLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [script, segments, transcript, frenchMap]);
+
+  const frenchOf = (t: string) => (script === "french" ? (frenchMap.get(t) ?? t) : t);
 
   const base = file ? file.name.replace(/\.[^.]+$/, "") : "transcript";
 
   const scriptedSegments = (): Segment[] =>
     segments.map((s) => ({
       ...s,
-      text: applyScript(s.text, script),
-      words: s.words?.map((w) => ({ ...w, text: applyScript(w.text, script) })),
+      text: frenchOf(s.text),
+      words: s.words?.map((w) => ({ ...w, text: frenchOf(w.text) })),
     }));
 
   const exportTxt = () =>
-    downloadFile(`${base}.txt`, applyScript(transcript, script), "text/plain;charset=utf-8");
+    downloadFile(`${base}.txt`, frenchOf(transcript), "text/plain;charset=utf-8");
   const exportSrt = () => {
     const segs = scriptedSegments();
     downloadFile(
