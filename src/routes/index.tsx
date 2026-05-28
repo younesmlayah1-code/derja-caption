@@ -540,26 +540,24 @@ function Home() {
                 )}
               </div>
               {editingFull ? (
-                <textarea
-                  value={draftFull}
-                  onChange={(e) => setDraftFull(e.target.value)}
-                  dir={script === "arabic" ? "rtl" : "ltr"}
-                  rows={Math.min(16, Math.max(4, Math.ceil(draftFull.length / 60)))}
-                  className={`w-full resize-y rounded-md border border-border bg-background/60 p-3 text-base leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary/40 ${script === "arabic" ? "text-right" : "text-left"}`}
-                  style={
-                    script === "arabic"
-                      ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
-                      : undefined
-                  }
-                />
-              )}
-              {editingFull && (
-                <p className="mt-2 text-xs text-muted-foreground/70">
-                  Keep the <code className="rounded bg-secondary/60 px-1">[mm:ss]</code> at the start of each line to preserve timestamps. New lines without a prefix get a time after the previous one.
-                </p>
-              )}
-              {!editingFull && (
-
+                <>
+                  <textarea
+                    value={draftFull}
+                    onChange={(e) => setDraftFull(e.target.value)}
+                    dir={script === "arabic" ? "rtl" : "ltr"}
+                    rows={Math.min(16, Math.max(4, Math.ceil(draftFull.length / 60)))}
+                    className={`w-full resize-y rounded-md border border-border bg-background/60 p-3 text-base leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary/40 ${script === "arabic" ? "text-right" : "text-left"}`}
+                    style={
+                      script === "arabic"
+                        ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
+                        : undefined
+                    }
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground/70">
+                    Keep the <code className="rounded bg-secondary/60 px-1">[mm:ss]</code> at the start of each line to preserve timestamps.
+                  </p>
+                </>
+              ) : (
                 <p
                   dir={script === "arabic" ? "rtl" : "ltr"}
                   className={`whitespace-pre-wrap text-base leading-relaxed ${script === "arabic" ? "text-right" : "text-left"}`}
@@ -572,6 +570,7 @@ function Home() {
                   {frenchOf(liveTranscript)}
                 </p>
               )}
+
             </div>
 
 
