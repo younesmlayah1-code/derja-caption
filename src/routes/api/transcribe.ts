@@ -42,6 +42,8 @@ export const Route = createFileRoute("/api/transcribe")({
         upstream.append("model", "whisper-large-v3");
         upstream.append("language", "ar");
         upstream.append("response_format", "verbose_json");
+        upstream.append("timestamp_granularities[]", "segment");
+        upstream.append("timestamp_granularities[]", "word");
         upstream.append("temperature", "0");
         upstream.append("prompt", derjaPrompt);
 
