@@ -98,8 +98,12 @@ function flattenWords(segments: Segment[], words?: Word[]): Word[] {
 }
 
 export function toSrt(segments: Segment[]) {
-  return flattenWords(segments)
-    .map((s, i) => `${i + 1}\n${fmtSrt(s.start)} --> ${fmtSrt(s.end)}\n${s.text}\n`)
+  return segments
+    .filter((s) => (s.text || "").trim().length > 0)
+    .map(
+      (s, i) =>
+        `${i + 1}\n${fmtSrt(s.start)} --> ${fmtSrt(s.end)}\n${s.text.trim()}\n`,
+    )
     .join("\n");
 }
 
