@@ -552,7 +552,14 @@ function Home() {
                       : undefined
                   }
                 />
-              ) : (
+              )}
+              {editingFull && (
+                <p className="mt-2 text-xs text-muted-foreground/70">
+                  Keep the <code className="rounded bg-secondary/60 px-1">[mm:ss]</code> at the start of each line to preserve timestamps. New lines without a prefix get a time after the previous one.
+                </p>
+              )}
+              {!editingFull && (
+
                 <p
                   dir={script === "arabic" ? "rtl" : "ltr"}
                   className={`whitespace-pre-wrap text-base leading-relaxed ${script === "arabic" ? "text-right" : "text-left"}`}
