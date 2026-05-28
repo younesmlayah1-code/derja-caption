@@ -10,6 +10,8 @@ import {
   Clock,
   AlignLeft,
   AlignJustify,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import {
   toSrt,
@@ -172,6 +174,33 @@ function Home() {
 
   const frenchOf = (t: string) => (script === "french" ? (frenchMap.get(t) ?? t) : t);
 
+  const updateSegmentText = (id: number, text: string) => {
+    setSegments((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, text, words: undefined } : s)),
+    );
+  };
+
+  const deleteSegment = (id: number) => {
+    setSegments((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const addSegmentAfter = (id: number) => {
+    setSegments((prev) => {
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx === -1) return prev;
+      const cur = prev[idx];
+      const nextSeg = prev[idx + 1];
+      const newStart = cur.end;
+      const newEnd = nextSeg ? Math.min(nextSeg.start, cur.end + 2) : cur.end + 2;
+      const newId = (prev.length ? Math.max(...prev.map((p) => p.id)) : 0) + 1;
+      const newSeg: Segment = { id: newId, start: newStart, end: newEnd, text: "", words: [] };
+      return [...prev.slice(0, idx + 1), newSeg, ...prev.slice(idx + 1)];
+    });
+  };
+
+  // Live transcript derived from current segments — reflects all edits.
+  const liveTranscript = segments.map((s) => s.text).join(" ").trim() || transcript;
+
   const base = file ? file.name.replace(/\.[^.]+$/, "") : "transcript";
 
   const scriptedSegments = (): Segment[] =>
@@ -182,7 +211,7 @@ function Home() {
     }));
 
   const exportTxt = () =>
-    downloadFile(`${base}.txt`, frenchOf(transcript), "text/plain;charset=utf-8");
+    downloadFile(`${base}.txt`, frenchOf(liveTranscript), "text/plain;charset=utf-8");
   const exportSrt = () => {
     const segs = scriptedSegments();
     downloadFile(
