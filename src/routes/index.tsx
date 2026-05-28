@@ -174,6 +174,33 @@ function Home() {
         )}
 
         {!segments.length && (
+          <div className="mx-auto mb-5 flex max-w-sm items-center justify-center gap-1 rounded-xl border border-border bg-card/40 p-1 backdrop-blur">
+            <button
+              onClick={() => setExportMode("line")}
+              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                exportMode === "line"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <AlignLeft className="h-4 w-4" />
+              Line per line
+            </button>
+            <button
+              onClick={() => setExportMode("word")}
+              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                exportMode === "word"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <AlignJustify className="h-4 w-4" />
+              Word by word
+            </button>
+          </div>
+        )}
+
+        {!segments.length && (
           <section
             onDragOver={(e) => {
               e.preventDefault();
@@ -320,7 +347,7 @@ function Home() {
               </h3>
               <div className="max-h-96 space-y-2 overflow-y-auto pr-2">
                 {segments.map((s) => {
-                  const captionWords = segmentToWordCues(s);
+                  const captionWords = exportMode === "word" ? segmentToWordCues(s) : [];
                   return (
                     <div
                       key={s.id}
@@ -357,30 +384,7 @@ function Home() {
               </div>
             </div>
 
-            <div className="flex items-center justify-center gap-1 rounded-xl border border-border bg-card/40 p-1 backdrop-blur">
-              <button
-                onClick={() => setExportMode("line")}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  exportMode === "line"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <AlignLeft className="h-4 w-4" />
-                Line per line
-              </button>
-              <button
-                onClick={() => setExportMode("word")}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  exportMode === "word"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <AlignJustify className="h-4 w-4" />
-                Word by word
-              </button>
-            </div>
+
 
             <div className="grid grid-cols-3 gap-2">
               {[
