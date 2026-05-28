@@ -651,12 +651,12 @@ function Home() {
 
 
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-muted-foreground">
                   Timestamped captions
                 </h3>
-                <span className="text-xs text-muted-foreground/70">
-                  Click any line to edit · changes save automatically
+                <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                  Tap any line below to edit · changes save automatically
                 </span>
               </div>
               {script === "french" && translitLoading ? (
@@ -665,13 +665,13 @@ function Home() {
                   Please wait — converting Derja to French script…
                 </div>
               ) : (
-                <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-2">
+                <div className="max-h-[32rem] space-y-3 overflow-y-auto pr-2">
                   {segments.map((s) => {
                     const captionWords = exportMode === "word" ? segmentToWordCues(s) : [];
                     const displayText = displayFor(s);
                     return (
-                      <div key={s.id} className="group/row space-y-1">
-                        <div className="flex items-start gap-2 rounded-xl bg-secondary/40 p-3 transition-colors hover:bg-secondary/70">
+                      <div key={s.id} className="group/row">
+                        <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3 transition-colors focus-within:border-primary/60 focus-within:bg-background/60 hover:bg-secondary/60">
                           <span className="mt-1 shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
                             {fmtTime(s.start)}
                           </span>
@@ -680,10 +680,11 @@ function Home() {
                               value={displayText}
                               onChange={(e) => updateSegmentDisplay(s.id, e.target.value)}
                               dir={script === "arabic" ? "rtl" : "ltr"}
-                              rows={Math.min(6, Math.max(1, Math.ceil(displayText.length / 50)))}
-                              className={`w-full resize-none rounded-md bg-transparent text-sm leading-relaxed focus:bg-background/60 focus:outline-none focus:ring-1 focus:ring-primary/40 ${
+                              rows={Math.min(6, Math.max(2, Math.ceil(displayText.length / 40)))}
+                              className={`w-full resize-y rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-base leading-relaxed shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${
                                 script === "arabic" ? "text-right" : "text-left"
                               }`}
+
                             style={
                               script === "arabic"
                                 ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
