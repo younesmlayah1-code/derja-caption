@@ -25,6 +25,33 @@ import {
 } from "@/lib/subtitles";
 import { transcribeFile, type RateInfo } from "@/lib/transcribe";
 
+function splitLongSegments(segs: Segment[]): Segment[] {
+  const out: Segment[] = [];
+  let nextId = 1;
+  for (const s of segs) {
+    const tokens = (s.text || "").split(/\s+/).filter(Boolean);
+    if (tokens.length < 4) {
+      out.push({ ...s, id: nextId++ });
+      continue;
+    }
+    const mid = Math.ceil(tokens.length / 2);
+    const firstText = tokens.slice(0, mid).join(" ");
+    const secondText = tokens.slice(mid).join(" ");
+    const words = (s.words || []).filter((w) => w.text);
+    let boundary = s.start + (s.end - s.start) / 2;
+    let firstWords = undefined;
+    let secondWords = undefined;
+    if (words.length === tokens.length) {
+      boundary = words[mid].start;
+      firstWords = words.slice(0, mid);
+      secondWords = words.slice(mid);
+    }
+    out.push({ id: nextId++, start: s.start, end: boundary, text: firstText, words: firstWords });
+    out.push({ id: nextId++, start: boundary, end: s.end, text: secondText, words: secondWords });
+  }
+  return out;
+}
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
