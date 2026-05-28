@@ -67,6 +67,11 @@ export async function transcribeFile(
         start: s.start + chunk.startSec,
         end: s.end + chunk.startSec,
         text: s.text,
+        words: s.words?.map((w) => ({
+          start: w.start + chunk.startSec,
+          end: w.end + chunk.startSec,
+          text: w.text,
+        })),
       });
     }
   }
