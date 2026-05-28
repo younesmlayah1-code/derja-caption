@@ -198,6 +198,39 @@ function Home() {
     });
   };
 
+  const [editingFull, setEditingFull] = useState(false);
+  const [draftFull, setDraftFull] = useState("");
+
+  const saveFullTranscript = () => {
+    const newWords = draftFull.trim().split(/\s+/).filter(Boolean);
+    if (segments.length === 0) {
+      setEditingFull(false);
+      return;
+    }
+    const counts = segments.map(
+      (s) => s.text.trim().split(/\s+/).filter(Boolean).length || 1,
+    );
+    const total = counts.reduce((a, b) => a + b, 0);
+    let idx = 0;
+    const allocations = counts.map((c, i) => {
+      if (i === counts.length - 1) return Math.max(0, newWords.length - idx);
+      const n = Math.max(0, Math.round((newWords.length * c) / total));
+      idx += n;
+      return n;
+    });
+    idx = 0;
+    setSegments((prev) =>
+      prev.map((s, i) => {
+        const take = allocations[i];
+        const slice = newWords.slice(idx, idx + take).join(" ");
+        idx += take;
+        return { ...s, text: slice, words: undefined };
+      }),
+    );
+    setEditingFull(false);
+  };
+
+
   // Live transcript derived from current segments — reflects all edits.
   const liveTranscript = segments.map((s) => s.text).join(" ").trim() || transcript;
 
@@ -451,19 +484,63 @@ function Home() {
             </div>
 
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
-              <h3 className="mb-3 text-sm font-semibold text-muted-foreground">Full transcript</h3>
-              <p
-                dir={script === "arabic" ? "rtl" : "ltr"}
-                className={`whitespace-pre-wrap text-base leading-relaxed ${script === "arabic" ? "text-right" : "text-left"}`}
-                style={
-                  script === "arabic"
-                    ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
-                    : undefined
-                }
-              >
-                {frenchOf(liveTranscript)}
-              </p>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-muted-foreground">Full transcript</h3>
+                {!editingFull ? (
+                  <button
+                    onClick={() => {
+                      setDraftFull(frenchOf(liveTranscript));
+                      setEditingFull(true);
+                    }}
+                    className="rounded-lg bg-secondary px-3 py-1 text-xs hover:bg-secondary/80"
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setEditingFull(false)}
+                      className="rounded-lg bg-secondary px-3 py-1 text-xs hover:bg-secondary/80"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveFullTranscript}
+                      className="rounded-lg bg-primary px-3 py-1 text-xs text-primary-foreground hover:opacity-90"
+                    >
+                      Save
+                    </button>
+                  </div>
+                )}
+              </div>
+              {editingFull ? (
+                <textarea
+                  value={draftFull}
+                  onChange={(e) => setDraftFull(e.target.value)}
+                  dir={script === "arabic" ? "rtl" : "ltr"}
+                  rows={Math.min(16, Math.max(4, Math.ceil(draftFull.length / 60)))}
+                  className={`w-full resize-y rounded-md border border-border bg-background/60 p-3 text-base leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary/40 ${script === "arabic" ? "text-right" : "text-left"}`}
+                  style={
+                    script === "arabic"
+                      ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
+                      : undefined
+                  }
+                />
+              ) : (
+                <p
+                  dir={script === "arabic" ? "rtl" : "ltr"}
+                  className={`whitespace-pre-wrap text-base leading-relaxed ${script === "arabic" ? "text-right" : "text-left"}`}
+                  style={
+                    script === "arabic"
+                      ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
+                      : undefined
+                  }
+                >
+                  {frenchOf(liveTranscript)}
+                </p>
+              )}
             </div>
+
 
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
               <div className="mb-3 flex items-center justify-between">
