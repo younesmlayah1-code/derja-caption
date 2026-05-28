@@ -6,10 +6,11 @@ function pad(n: number, len = 2) {
 }
 
 function fmtSrt(t: number) {
-  const h = Math.floor(t / 3600);
-  const m = Math.floor((t % 3600) / 60);
-  const s = Math.floor(t % 60);
-  const ms = Math.floor((t - Math.floor(t)) * 1000);
+  const safe = Math.max(0, t);
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  const s = Math.floor(safe % 60);
+  const ms = Math.round((safe - Math.floor(safe)) * 1000);
   return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`;
 }
 
@@ -17,7 +18,8 @@ function fmtVtt(t: number) {
   return fmtSrt(t).replace(",", ".");
 }
 
-function flattenWords(segments: Segment[]): { start: number; end: number; text: string }[] {
+function flattenWords(segments: Segment[], words?: Word[]): Word[] {
+  if (words && words.length > 0) return words.filter((w) => w.text).sort((a, b) => a.start - b.start);
   const out: { start: number; end: number; text: string }[] = [];
   for (const s of segments) {
     if (s.words && s.words.length > 0) {
@@ -37,11 +39,26 @@ export function toSrt(segments: Segment[]) {
     .join("\n");
 }
 
+export function toWordSrt(words: Word[]) {
+  return flattenWords([], words)
+    .map((w, i) => `${i + 1}\n${fmtSrt(w.start)} --> ${fmtSrt(w.end)}\n${w.text}\n`)
+    .join("\n");
+}
+
 export function toVtt(segments: Segment[]) {
   return (
     "WEBVTT\n\n" +
     flattenWords(segments)
       .map((s) => `${fmtVtt(s.start)} --> ${fmtVtt(s.end)}\n${s.text}\n`)
+      .join("\n")
+  );
+}
+
+export function toWordVtt(words: Word[]) {
+  return (
+    "WEBVTT\n\n" +
+    flattenWords([], words)
+      .map((w) => `${fmtVtt(w.start)} --> ${fmtVtt(w.end)}\n${w.text}\n`)
       .join("\n")
   );
 }

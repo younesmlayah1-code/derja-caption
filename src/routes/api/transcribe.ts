@@ -29,18 +29,18 @@ export const Route = createFileRoute("/api/transcribe")({
           );
         }
 
-        // Derja-biased Arabic prompt: includes common Tunisian dialect words
-        // so Whisper transcribes in Derja (not Fosha/MSA), while staying in
-        // Arabic script. Keep it focused — overly long word lists cause
-        // repetition artifacts (handled separately by dedupeRepeats).
+        // Derja-biased prompt: keep Tunisian Arabic as Derja, but preserve
+        // code-switched French/English words in Latin letters instead of
+        // forcing everything into Arabic script.
         const derjaPrompt =
-          "تفريغ صوتي باللهجة التونسية الدارجة بالحروف العربية فقط، مع علامات الترقيم. " +
+          "فرّغ الكلام باللهجة التونسية الدارجة كما هو، لا تحوّله للفصحى. " +
+          "الكلام العربي اكتبه بالحروف العربية، وأي كلمة فرنسية أو إنجليزية منطوقة اكتبها بلغتها وبحروف Latin الأصلية. " +
+          "أمثلة: montage, business, marketing, problème, service. " +
           "أمثلة كلمات دارجة: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، باهي، موش، ماكش، توا، يعيشك، زادا، خاطر، نحب، نجم، نمشي، نشوف، نحكي، فما، أما، إيا.";
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
         upstream.append("model", "whisper-large-v3");
-        upstream.append("language", "ar");
         upstream.append("response_format", "verbose_json");
         upstream.append("timestamp_granularities[]", "segment");
         upstream.append("timestamp_granularities[]", "word");
