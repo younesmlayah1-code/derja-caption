@@ -538,8 +538,8 @@ function Home() {
                                 value={displayText}
                                 onChange={(e) => updateSegmentDisplay(s.id, e.target.value)}
                                 dir={script === "arabic" ? "rtl" : "ltr"}
-                                rows={Math.min(6, Math.max(2, Math.ceil(displayText.length / 40)))}
-                                className={`w-full resize-y rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-base leading-relaxed shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${
+                                rows={Math.min(3, Math.max(1, Math.ceil(displayText.length / 60)))}
+                                className={`w-full max-w-xl resize-y rounded-lg border border-border/70 bg-background/80 px-3 py-1.5 text-sm leading-snug shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${
                                   script === "arabic" ? "text-right" : "text-left"
                                 }`}
                                 style={
@@ -563,9 +563,27 @@ function Home() {
                                 {captionWords.map((w, i) => (
                                   <span
                                     key={i}
-                                    className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/70 px-2 py-1 text-sm"
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/70 px-2 py-1 text-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30"
                                   >
-                                    <span>{w.text}</span>
+                                    <input
+                                      type="text"
+                                      value={w.text}
+                                      onChange={(e) => {
+                                        const tokens = displayText.split(/\s+/).filter(Boolean);
+                                        tokens[i] = e.target.value;
+                                        updateSegmentDisplay(s.id, tokens.join(" "));
+                                      }}
+                                      dir={script === "arabic" ? "rtl" : "ltr"}
+                                      size={Math.max(2, w.text.length)}
+                                      className={`bg-transparent outline-none ${
+                                        script === "arabic" ? "text-right" : "text-left"
+                                      }`}
+                                      style={
+                                        script === "arabic"
+                                          ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
+                                          : undefined
+                                      }
+                                    />
                                     <span className="font-mono text-[10px] text-muted-foreground/70">
                                       {fmtTime(w.start)}
                                     </span>
