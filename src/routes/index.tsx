@@ -414,14 +414,14 @@ function Home() {
                               title={`${fmtTime(w.start)} – ${fmtTime(w.end)}`}
                               className="group inline-flex flex-col items-center rounded-md px-1.5 py-0.5 hover:bg-primary/15"
                             >
-                              <span>{w.text}</span>
+                              <span>{applyScript(w.text, script)}</span>
                               <span className="font-mono text-[10px] text-muted-foreground/70">
                                 {fmtTime(w.start)}
                               </span>
                             </span>
                           ))
                         ) : (
-                          <span>{s.text}</span>
+                          <span>{applyScript(s.text, script)}</span>
                         )}
                       </div>
                     </div>
