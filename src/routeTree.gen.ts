@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiTransliterateRouteImport } from './routes/api/transliterate'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTransliterateRoute = ApiTransliterateRouteImport.update({
+  id: '/api/transliterate',
+  path: '/api/transliterate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
@@ -26,27 +32,31 @@ const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/transliterate': typeof ApiTransliterateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/transliterate': typeof ApiTransliterateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/transliterate': typeof ApiTransliterateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/transcribe'
+  fullPaths: '/' | '/api/transcribe' | '/api/transliterate'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/transcribe'
-  id: '__root__' | '/' | '/api/transcribe'
+  to: '/' | '/api/transcribe' | '/api/transliterate'
+  id: '__root__' | '/' | '/api/transcribe' | '/api/transliterate'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
+  ApiTransliterateRoute: typeof ApiTransliterateRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/transliterate': {
+      id: '/api/transliterate'
+      path: '/api/transliterate'
+      fullPath: '/api/transliterate'
+      preLoaderRoute: typeof ApiTransliterateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/transcribe': {
@@ -71,7 +88,18 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
+  ApiTransliterateRoute: ApiTransliterateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
