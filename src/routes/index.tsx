@@ -17,6 +17,7 @@ import {
   toWordSrtFromSegments,
   toWordVttFromSegments,
   segmentToWordCues,
+  applyScript,
   fmtTime,
   downloadFile,
   type Segment,
@@ -59,6 +60,7 @@ function Home() {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [exportMode, setExportMode] = useState<"word" | "line">("word");
+  const [script, setScript] = useState<"arabic" | "french">("arabic");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validate = (f: File): string | null => {
@@ -123,19 +125,31 @@ function Home() {
 
   const base = file ? file.name.replace(/\.[^.]+$/, "") : "transcript";
 
-  const exportTxt = () => downloadFile(`${base}.txt`, transcript, "text/plain;charset=utf-8");
-  const exportSrt = () =>
+  const scriptedSegments = (): Segment[] =>
+    segments.map((s) => ({
+      ...s,
+      text: applyScript(s.text, script),
+      words: s.words?.map((w) => ({ ...w, text: applyScript(w.text, script) })),
+    }));
+
+  const exportTxt = () =>
+    downloadFile(`${base}.txt`, applyScript(transcript, script), "text/plain;charset=utf-8");
+  const exportSrt = () => {
+    const segs = scriptedSegments();
     downloadFile(
       `${base}.srt`,
-      segments.length && exportMode === "word" ? toWordSrtFromSegments(segments) : toSrt(segments),
+      segs.length && exportMode === "word" ? toWordSrtFromSegments(segs) : toSrt(segs),
       "application/x-subrip;charset=utf-8",
     );
-  const exportVtt = () =>
+  };
+  const exportVtt = () => {
+    const segs = scriptedSegments();
     downloadFile(
       `${base}.vtt`,
-      segments.length && exportMode === "word" ? toWordVttFromSegments(segments) : toVtt(segments),
+      segs.length && exportMode === "word" ? toWordVttFromSegments(segs) : toVtt(segs),
       "text/vtt;charset=utf-8",
     );
+  };
 
   const busy = status === "extracting" || status === "uploading" || status === "transcribing";
 
@@ -174,29 +188,53 @@ function Home() {
         )}
 
         {!segments.length && (
-          <div className="mx-auto mb-5 flex max-w-sm items-center justify-center gap-1 rounded-xl border border-border bg-card/40 p-1 backdrop-blur">
-            <button
-              onClick={() => setExportMode("line")}
-              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                exportMode === "line"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <AlignLeft className="h-4 w-4" />
-              Line per line
-            </button>
-            <button
-              onClick={() => setExportMode("word")}
-              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                exportMode === "word"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <AlignJustify className="h-4 w-4" />
-              Word by word
-            </button>
+          <div className="mx-auto mb-5 max-w-sm space-y-2">
+            <div className="flex items-center justify-center gap-1 rounded-xl border border-border bg-card/40 p-1 backdrop-blur">
+              <button
+                onClick={() => setExportMode("line")}
+                className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  exportMode === "line"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <AlignLeft className="h-4 w-4" />
+                Line per line
+              </button>
+              <button
+                onClick={() => setExportMode("word")}
+                className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  exportMode === "word"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <AlignJustify className="h-4 w-4" />
+                Word by word
+              </button>
+            </div>
+            <div className="flex items-center justify-center gap-1 rounded-xl border border-border bg-card/40 p-1 backdrop-blur">
+              <button
+                onClick={() => setScript("arabic")}
+                className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  script === "arabic"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Derja · Arabic
+              </button>
+              <button
+                onClick={() => setScript("french")}
+                className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  script === "french"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Derja · French
+              </button>
+            </div>
           </div>
         )}
 
@@ -333,11 +371,15 @@ function Home() {
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
               <h3 className="mb-3 text-sm font-semibold text-muted-foreground">Full transcript</h3>
               <p
-                dir="rtl"
-                className="whitespace-pre-wrap text-right text-base leading-relaxed"
-                style={{ fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }}
+                dir={script === "arabic" ? "rtl" : "ltr"}
+                className={`whitespace-pre-wrap text-base leading-relaxed ${script === "arabic" ? "text-right" : "text-left"}`}
+                style={
+                  script === "arabic"
+                    ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
+                    : undefined
+                }
               >
-                {transcript}
+                {applyScript(transcript, script)}
               </p>
             </div>
 
@@ -357,9 +399,13 @@ function Home() {
                         {fmtTime(s.start)}
                       </span>
                       <div
-                        dir="rtl"
-                        className="flex flex-1 flex-wrap justify-end gap-1.5 text-right text-sm leading-relaxed"
-                        style={{ fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }}
+                        dir={script === "arabic" ? "rtl" : "ltr"}
+                        className={`flex flex-1 flex-wrap gap-1.5 text-sm leading-relaxed ${script === "arabic" ? "justify-end text-right" : "justify-start text-left"}`}
+                        style={
+                          script === "arabic"
+                            ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
+                            : undefined
+                        }
                       >
                         {captionWords.length > 0 ? (
                           captionWords.map((w, i) => (
@@ -368,14 +414,14 @@ function Home() {
                               title={`${fmtTime(w.start)} – ${fmtTime(w.end)}`}
                               className="group inline-flex flex-col items-center rounded-md px-1.5 py-0.5 hover:bg-primary/15"
                             >
-                              <span>{w.text}</span>
+                              <span>{applyScript(w.text, script)}</span>
                               <span className="font-mono text-[10px] text-muted-foreground/70">
                                 {fmtTime(w.start)}
                               </span>
                             </span>
                           ))
                         ) : (
-                          <span>{s.text}</span>
+                          <span>{applyScript(s.text, script)}</span>
                         )}
                       </div>
                     </div>

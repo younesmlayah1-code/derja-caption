@@ -1,6 +1,68 @@
 export type Word = { start: number; end: number; text: string };
 export type Segment = { id: number; start: number; end: number; text: string; words?: Word[] };
 
+// ---------- Derja Arabic → Latin (French-style) transliteration ----------
+// Approximate "arabizi" used by Tunisians in chat: 5=خ, 3=ع, 7=ح, 9=ق.
+// Not perfect (Arabic script omits short vowels) but produces readable Derja
+// like "nekhdem", "maryoul", "ya3tik essa77a".
+const AR_DIACRITICS = /[\u064B-\u0652\u0670\u0640]/g;
+const LETTER_MAP: Record<string, string> = {
+  "ا": "a", "أ": "a", "إ": "i", "آ": "a", "ى": "a",
+  "ب": "b", "ت": "t", "ث": "th", "ج": "j", "ح": "7", "خ": "5",
+  "د": "d", "ذ": "dh", "ر": "r", "ز": "z", "س": "s", "ش": "ch",
+  "ص": "s", "ض": "dh", "ط": "t", "ظ": "dh",
+  "ع": "3", "غ": "gh", "ف": "f", "ق": "9", "ك": "k",
+  "ل": "l", "م": "m", "ن": "n", "ه": "h", "ة": "a",
+  "و": "w", "ي": "y", "ؤ": "'", "ئ": "'", "ء": "'",
+  "گ": "g", "ڨ": "g", "ڭ": "g", "پ": "p", "ڤ": "v", "چ": "tch",
+};
+const VOWELS = new Set(["a", "e", "i", "o", "u", "ou"]);
+
+function transliterateWord(w: string): string {
+  // Keep already-Latin words (English/French) untouched.
+  if (!/[\u0600-\u06FF]/.test(w)) return w;
+  const cleaned = w.replace(AR_DIACRITICS, "");
+  const chars = [...cleaned];
+  const mapped: string[] = [];
+  for (let i = 0; i < chars.length; i++) {
+    const c = chars[i];
+    let m = LETTER_MAP[c];
+    if (m == null) {
+      // Keep punctuation / unknown chars as-is.
+      mapped.push(c);
+      continue;
+    }
+    // Context tweaks for semivowels: و/ي act as long vowels when not initial.
+    if (c === "و" && i > 0) m = "ou";
+    else if (c === "ي" && i > 0 && i < chars.length - 1) m = "i";
+    mapped.push(m);
+  }
+  // Insert epenthetic "e" between adjacent consonants for readability.
+  const out: string[] = [];
+  for (let i = 0; i < mapped.length; i++) {
+    const cur = mapped[i];
+    out.push(cur);
+    const next = mapped[i + 1];
+    if (!next) continue;
+    const curIsVowel = VOWELS.has(cur);
+    const nextIsVowel = VOWELS.has(next);
+    const prevWasE = out[out.length - 2] === "e";
+    if (!curIsVowel && !nextIsVowel && !prevWasE) out.push("e");
+  }
+  return out.join("");
+}
+
+export function transliterateDerja(text: string): string {
+  return text
+    .split(/(\s+)/)
+    .map((seg) => (/^\s+$/.test(seg) ? seg : transliterateWord(seg)))
+    .join("");
+}
+
+export function applyScript(text: string, script: "arabic" | "french"): string {
+  return script === "french" ? transliterateDerja(text) : text;
+}
+
 function pad(n: number, len = 2) {
   return n.toString().padStart(len, "0");
 }
