@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
-import { Upload, FileVideo, Loader2, Download, X, Languages, Clock } from "lucide-react";
+import { Upload, FileVideo, Loader2, Download, X, Languages, Clock, AlignLeft, AlignJustify } from "lucide-react";
 import {
   toSrt,
   toVtt,
