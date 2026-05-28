@@ -639,38 +639,54 @@ function Home() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setEditingFull(false)}
-                      className="rounded-lg bg-secondary px-3 py-1 text-xs hover:bg-secondary/80"
+                      className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium hover:bg-secondary/80"
                     >
-                      Cancel
+                      Cancel editing
                     </button>
                     <button
                       onClick={saveFullTranscript}
-                      className="rounded-lg bg-primary px-3 py-1 text-xs text-primary-foreground hover:opacity-90"
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
                     >
-                      Save
+                      Save changes
                     </button>
                   </div>
                 )}
               </div>
               {editingFull ? (
                 <>
+                  <div className="mb-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-foreground">
+                    <p className="font-semibold text-primary">How to edit</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed">
+                      <li>
+                        Edit the words freely — the{" "}
+                        <code className="rounded bg-secondary/60 px-1 font-mono">[mm:ss.mmm]</code>{" "}
+                        at the start of each line keeps the timing locked to the video.
+                      </li>
+                      <li>Add or remove whole lines to insert / delete segments.</li>
+                      <li>
+                        Click <span className="font-semibold">Save changes</span> when you&apos;re
+                        done, or <span className="font-semibold">Cancel editing</span> to discard.
+                      </li>
+                    </ul>
+                  </div>
                   <textarea
                     value={draftFull}
                     onChange={(e) => setDraftFull(e.target.value)}
                     dir={script === "arabic" ? "rtl" : "ltr"}
-                    rows={Math.min(16, Math.max(4, Math.ceil(draftFull.length / 60)))}
-                    className={`w-full resize-y rounded-md border border-border bg-background/60 p-3 text-base leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary/40 ${script === "arabic" ? "text-right" : "text-left"}`}
+                    rows={Math.min(20, Math.max(8, draftFull.split("\n").length + 1))}
+                    className={`w-full resize-y rounded-xl border-2 border-primary/30 bg-background p-4 text-base leading-loose focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${script === "arabic" ? "text-right" : "text-left"}`}
                     style={
                       script === "arabic"
                         ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
                         : undefined
                     }
                   />
-                  <p className="mt-2 text-xs text-muted-foreground/70">
-                    Keep the <code className="rounded bg-secondary/60 px-1">[mm:ss]</code> at the
-                    start of each line to preserve timestamps.
-                  </p>
                 </>
+              ) : script === "french" && translitLoading ? (
+                <div className="flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-6 text-sm text-primary">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Please wait — converting Derja to French script…
+                </div>
               ) : (
                 <p
                   dir={script === "arabic" ? "rtl" : "ltr"}
@@ -681,7 +697,7 @@ function Home() {
                       : undefined
                   }
                 >
-                  {frenchOf(liveTranscript)}
+                  {liveTranscript}
                 </p>
               )}
             </div>
@@ -695,29 +711,31 @@ function Home() {
                   Click any line to edit · changes save automatically
                 </span>
               </div>
-              <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-2">
-                {segments.map((s) => {
-                  const captionWords = exportMode === "word" ? segmentToWordCues(s) : [];
-                  const displayText = frenchOf(s.text);
-                  return (
-                    <div key={s.id} className="group/row space-y-1">
-                      <div className="flex items-start gap-2 rounded-xl bg-secondary/40 p-3 transition-colors hover:bg-secondary/70">
-                        <span className="mt-1 shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
-                          {fmtTime(s.start)}
-                        </span>
-                        <div className="flex flex-1 flex-col gap-1.5">
-                          <textarea
-                            value={displayText}
-                            onChange={(e) => {
-                              // In French view, editing replaces the Arabic source with the
-                              // typed Latin text so exports match what the user sees.
-                              updateSegmentText(s.id, e.target.value);
-                            }}
-                            dir={script === "arabic" ? "rtl" : "ltr"}
-                            rows={Math.min(6, Math.max(1, Math.ceil(displayText.length / 50)))}
-                            className={`w-full resize-none rounded-md bg-transparent text-sm leading-relaxed focus:bg-background/60 focus:outline-none focus:ring-1 focus:ring-primary/40 ${
-                              script === "arabic" ? "text-right" : "text-left"
-                            }`}
+              {script === "french" && translitLoading ? (
+                <div className="flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-6 text-sm text-primary">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Please wait — converting Derja to French script…
+                </div>
+              ) : (
+                <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-2">
+                  {segments.map((s) => {
+                    const captionWords = exportMode === "word" ? segmentToWordCues(s) : [];
+                    const displayText = displayFor(s);
+                    return (
+                      <div key={s.id} className="group/row space-y-1">
+                        <div className="flex items-start gap-2 rounded-xl bg-secondary/40 p-3 transition-colors hover:bg-secondary/70">
+                          <span className="mt-1 shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
+                            {fmtTime(s.start)}
+                          </span>
+                          <div className="flex flex-1 flex-col gap-1.5">
+                            <textarea
+                              value={displayText}
+                              onChange={(e) => updateSegmentDisplay(s.id, e.target.value)}
+                              dir={script === "arabic" ? "rtl" : "ltr"}
+                              rows={Math.min(6, Math.max(1, Math.ceil(displayText.length / 50)))}
+                              className={`w-full resize-none rounded-md bg-transparent text-sm leading-relaxed focus:bg-background/60 focus:outline-none focus:ring-1 focus:ring-primary/40 ${
+                                script === "arabic" ? "text-right" : "text-left"
+                              }`}
                             style={
                               script === "arabic"
                                 ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
