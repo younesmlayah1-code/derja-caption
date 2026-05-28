@@ -48,6 +48,7 @@ function Home() {
   const [transcript, setTranscript] = useState<string>("");
   const [segments, setSegments] = useState<Segment[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [exportMode, setExportMode] = useState<"word" | "line">("word");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validate = (f: File): string | null => {
