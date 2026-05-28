@@ -245,7 +245,7 @@ function Home() {
   };
 
   const buildDraft = () =>
-    segments.map((s) => `[${fmtExactTime(s.start)}] ${frenchOf(s.text)}`).join("\n");
+    segments.map((s) => `[${fmtExactTime(s.start)}] ${displayFor(s)}`).join("\n");
 
   const saveFullTranscript = () => {
     const rawLines = draftFull
@@ -257,13 +257,12 @@ function Home() {
       return;
     }
     const parsed = rawLines.map(parseTimePrefix);
-    setSegments((prev) => {
-      if (prev.length === 0) return prev;
-      let nextId = Math.max(...prev.map((p) => p.id)) + 1;
-      const used = new Set<number>();
-      let carryEnd = prev[0].start;
 
-      const takeMatchingSegment = (start: number | null, fallbackIndex: number) => {
+    // Match each draft line back to an existing segment by timestamp (or
+    // positional fallback) so we can route the edit to the right place.
+    const matchSegments = (prev: Segment[]) => {
+      const used = new Set<number>();
+      const take = (start: number | null, fallbackIndex: number) => {
         if (start != null) {
           let bestIndex = -1;
           let bestDiff = Infinity;
@@ -280,22 +279,84 @@ function Home() {
             return prev[bestIndex];
           }
         }
-
         if (prev[fallbackIndex] && !used.has(fallbackIndex) && start == null) {
           used.add(fallbackIndex);
           return prev[fallbackIndex];
         }
-
         return null;
       };
+      return parsed.map((p, i) => ({ p, base: take(p.start, i) }));
+    };
 
-      return parsed.map((p, i) => {
-        const base = takeMatchingSegment(p.start, i);
+    if (script === "french") {
+      // In French mode, never rewrite Arabic source — store edits as overrides
+      // keyed by the matched segment id. New (unmatched) lines fall back to
+      // creating a new segment whose Arabic text is the typed Latin string.
+      const matches = matchSegments(segments);
+      setFrenchOverrides((prev) => {
+        const next = new Map(prev);
+        for (const { p, base } of matches) {
+          if (base) next.set(base.id, p.text);
+        }
+        return next;
+      });
+      // Handle insertions/deletions if line count changed.
+      const hasNewLines = matches.some((m) => !m.base);
+      const matchedIds = new Set(
+        matches.filter((m) => m.base).map((m) => m.base!.id),
+      );
+      const droppedAny = segments.some((s) => !matchedIds.has(s.id));
+      if (hasNewLines || droppedAny) {
+        setSegments((prev) => {
+          let nextId = prev.length ? Math.max(...prev.map((p) => p.id)) + 1 : 1;
+          let carryEnd = prev[0]?.start ?? 0;
+          const usedIds = new Set<number>();
+          const out: Segment[] = [];
+          const remathches = matchSegments(prev);
+          for (let i = 0; i < remathches.length; i++) {
+            const { p, base } = remathches[i];
+            if (base) {
+              usedIds.add(base.id);
+              carryEnd = base.end;
+              out.push(base);
+            } else {
+              const nextTimed = parsed
+                .slice(i + 1)
+                .find((item) => item.start != null)?.start;
+              const start = p.start ?? carryEnd;
+              const end = Math.max(
+                start + 0.5,
+                nextTimed != null && nextTimed > start ? nextTimed : start + 2,
+              );
+              carryEnd = end;
+              const id = nextId++;
+              // Store typed Latin text as override for the new segment.
+              setFrenchOverrides((prevMap) => {
+                const m = new Map(prevMap);
+                m.set(id, p.text);
+                return m;
+              });
+              out.push({ id, start, end, text: p.text, words: undefined });
+            }
+          }
+          return out;
+        });
+      }
+      setEditingFull(false);
+      return;
+    }
+
+    // Arabic mode: edits update the source text on each segment.
+    setSegments((prev) => {
+      if (prev.length === 0) return prev;
+      let nextId = Math.max(...prev.map((p) => p.id)) + 1;
+      let carryEnd = prev[0].start;
+      const remathches = matchSegments(prev);
+      return remathches.map(({ p, base }, i) => {
         if (base) {
           carryEnd = base.end;
           return { ...base, text: p.text, words: undefined };
         }
-
         const nextTimed = parsed.slice(i + 1).find((item) => item.start != null)?.start;
         const start = p.start ?? carryEnd;
         const end = Math.max(
@@ -312,21 +373,21 @@ function Home() {
   // Live transcript derived from current segments — reflects all edits.
   const liveTranscript =
     segments
-      .map((s) => s.text)
+      .map((s) => displayFor(s))
       .join(" ")
-      .trim() || transcript;
+      .trim() || (script === "french" ? frenchOf(transcript) : transcript);
 
   const base = file ? file.name.replace(/\.[^.]+$/, "") : "transcript";
 
   const scriptedSegments = (): Segment[] =>
     segments.map((s) => ({
       ...s,
-      text: frenchOf(s.text),
+      text: displayFor(s),
       words: s.words?.map((w) => ({ ...w, text: frenchOf(w.text) })),
     }));
 
   const exportTxt = () =>
-    downloadFile(`${base}.txt`, frenchOf(liveTranscript), "text/plain;charset=utf-8");
+    downloadFile(`${base}.txt`, liveTranscript, "text/plain;charset=utf-8");
   const exportSrt = () => {
     const segs = scriptedSegments();
     downloadFile(
