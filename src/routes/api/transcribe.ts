@@ -73,16 +73,32 @@ export const Route = createFileRoute("/api/transcribe")({
           text: ((w.word ?? w.text) || "").trim(),
         })).filter((w) => w.text.length > 0);
 
-        const rawSegments = (data.segments ?? []).map((s, i) => {
-          const segWords = allWords.filter((w) => w.start >= s.start - 0.01 && w.end <= s.end + 0.01);
-          return {
-            id: typeof s.id === "number" ? s.id : i,
-            start: s.start,
-            end: s.end,
-            text: dedupeRepeats((s.text || "").trim()),
-            words: segWords,
-          };
-        });
+        // Assign each word to the segment whose [start,end] contains its
+        // midpoint. Guarantees every word lands in exactly one segment — no
+        // drops on boundaries.
+        const segs = (data.segments ?? []).map((s, i) => ({
+          id: typeof s.id === "number" ? s.id : i,
+          start: s.start,
+          end: s.end,
+          text: dedupeRepeats((s.text || "").trim()),
+          words: [] as typeof allWords,
+        }));
+        for (const w of allWords) {
+          const mid = (w.start + w.end) / 2;
+          let idx = segs.findIndex((s) => mid >= s.start && mid <= s.end);
+          if (idx === -1) {
+            // Fallback: nearest segment by distance to midpoint.
+            let best = 0;
+            let bestDist = Infinity;
+            for (let i = 0; i < segs.length; i++) {
+              const d = Math.min(Math.abs(mid - segs[i].start), Math.abs(mid - segs[i].end));
+              if (d < bestDist) { bestDist = d; best = i; }
+            }
+            idx = best;
+          }
+          if (idx >= 0 && segs[idx]) segs[idx].words.push(w);
+        }
+        const rawSegments = segs;
 
         // Drop segments that became empty after dedupe.
         const segments = rawSegments.filter((s) => s.text.length > 0);
