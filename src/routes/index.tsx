@@ -236,7 +236,8 @@ function Home() {
           </div>
         )}
 
-        {!segments.length && (
+        {(
+
           <div className="mx-auto mb-5 max-w-sm space-y-2">
             <div className="flex items-center justify-center gap-1 rounded-xl border border-border bg-card/40 p-1 backdrop-blur">
               <button
