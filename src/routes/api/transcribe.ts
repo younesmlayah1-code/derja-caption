@@ -42,6 +42,8 @@ export const Route = createFileRoute("/api/transcribe")({
         upstream.append("model", "whisper-large-v3");
         upstream.append("language", "ar");
         upstream.append("response_format", "verbose_json");
+        upstream.append("timestamp_granularities[]", "segment");
+        upstream.append("timestamp_granularities[]", "word");
         upstream.append("temperature", "0");
         upstream.append("prompt", derjaPrompt);
 
@@ -62,14 +64,25 @@ export const Route = createFileRoute("/api/transcribe")({
         const data = (await res.json()) as {
           text?: string;
           segments?: Array<{ id?: number; start: number; end: number; text: string }>;
+          words?: Array<{ word?: string; text?: string; start: number; end: number }>;
         };
 
-        const rawSegments = (data.segments ?? []).map((s, i) => ({
-          id: typeof s.id === "number" ? s.id : i,
-          start: s.start,
-          end: s.end,
-          text: dedupeRepeats((s.text || "").trim()),
-        }));
+        const allWords = (data.words ?? []).map((w) => ({
+          start: w.start,
+          end: w.end,
+          text: ((w.word ?? w.text) || "").trim(),
+        })).filter((w) => w.text.length > 0);
+
+        const rawSegments = (data.segments ?? []).map((s, i) => {
+          const segWords = allWords.filter((w) => w.start >= s.start - 0.01 && w.end <= s.end + 0.01);
+          return {
+            id: typeof s.id === "number" ? s.id : i,
+            start: s.start,
+            end: s.end,
+            text: dedupeRepeats((s.text || "").trim()),
+            words: segWords,
+          };
+        });
 
         // Drop segments that became empty after dedupe.
         const segments = rawSegments.filter((s) => s.text.length > 0);
