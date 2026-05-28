@@ -291,13 +291,28 @@ function Home() {
                     <span className="shrink-0 rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
                       {fmtTime(s.start)}
                     </span>
-                    <p
+                    <div
                       dir="rtl"
-                      className="flex-1 text-right text-sm leading-relaxed"
+                      className="flex flex-1 flex-wrap justify-end gap-1.5 text-right text-sm leading-relaxed"
                       style={{ fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }}
                     >
-                      {s.text}
-                    </p>
+                      {s.words && s.words.length > 0 ? (
+                        s.words.map((w, i) => (
+                          <span
+                            key={i}
+                            title={`${fmtTime(w.start)} – ${fmtTime(w.end)}`}
+                            className="group inline-flex flex-col items-center rounded-md px-1.5 py-0.5 hover:bg-primary/15"
+                          >
+                            <span>{w.text}</span>
+                            <span className="font-mono text-[10px] text-muted-foreground/70">
+                              {fmtTime(w.start)}
+                            </span>
+                          </span>
+                        ))
+                      ) : (
+                        <span>{s.text}</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
