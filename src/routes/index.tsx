@@ -110,6 +110,7 @@ function Home() {
       setTranscript(result.text);
       setSegments(result.segments);
       setFrenchMap(new Map());
+      setFrenchOverrides(new Map());
       if (result.rate) setRate(result.rate);
       setStatus("done");
     } catch (e) {
@@ -124,11 +125,13 @@ function Home() {
     setTranscript("");
     setSegments([]);
     setFrenchMap(new Map());
+    setFrenchOverrides(new Map());
     setStatus("idle");
     setError(null);
   };
 
   const [frenchMap, setFrenchMap] = useState<Map<string, string>>(new Map());
+  const [frenchOverrides, setFrenchOverrides] = useState<Map<number, string>>(new Map());
   const [translitLoading, setTranslitLoading] = useState(false);
 
   useEffect(() => {
