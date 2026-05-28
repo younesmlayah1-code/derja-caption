@@ -17,6 +17,7 @@ import {
   toWordSrtFromSegments,
   toWordVttFromSegments,
   segmentToWordCues,
+  applyScript,
   fmtTime,
   downloadFile,
   type Segment,
@@ -59,6 +60,7 @@ function Home() {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [exportMode, setExportMode] = useState<"word" | "line">("word");
+  const [script, setScript] = useState<"arabic" | "french">("arabic");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validate = (f: File): string | null => {
@@ -123,19 +125,31 @@ function Home() {
 
   const base = file ? file.name.replace(/\.[^.]+$/, "") : "transcript";
 
-  const exportTxt = () => downloadFile(`${base}.txt`, transcript, "text/plain;charset=utf-8");
-  const exportSrt = () =>
+  const scriptedSegments = (): Segment[] =>
+    segments.map((s) => ({
+      ...s,
+      text: applyScript(s.text, script),
+      words: s.words?.map((w) => ({ ...w, text: applyScript(w.text, script) })),
+    }));
+
+  const exportTxt = () =>
+    downloadFile(`${base}.txt`, applyScript(transcript, script), "text/plain;charset=utf-8");
+  const exportSrt = () => {
+    const segs = scriptedSegments();
     downloadFile(
       `${base}.srt`,
-      segments.length && exportMode === "word" ? toWordSrtFromSegments(segments) : toSrt(segments),
+      segs.length && exportMode === "word" ? toWordSrtFromSegments(segs) : toSrt(segs),
       "application/x-subrip;charset=utf-8",
     );
-  const exportVtt = () =>
+  };
+  const exportVtt = () => {
+    const segs = scriptedSegments();
     downloadFile(
       `${base}.vtt`,
-      segments.length && exportMode === "word" ? toWordVttFromSegments(segments) : toVtt(segments),
+      segs.length && exportMode === "word" ? toWordVttFromSegments(segs) : toVtt(segs),
       "text/vtt;charset=utf-8",
     );
+  };
 
   const busy = status === "extracting" || status === "uploading" || status === "transcribing";
 
