@@ -371,11 +371,15 @@ function Home() {
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
               <h3 className="mb-3 text-sm font-semibold text-muted-foreground">Full transcript</h3>
               <p
-                dir="rtl"
-                className="whitespace-pre-wrap text-right text-base leading-relaxed"
-                style={{ fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }}
+                dir={script === "arabic" ? "rtl" : "ltr"}
+                className={`whitespace-pre-wrap text-base leading-relaxed ${script === "arabic" ? "text-right" : "text-left"}`}
+                style={
+                  script === "arabic"
+                    ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
+                    : undefined
+                }
               >
-                {transcript}
+                {applyScript(transcript, script)}
               </p>
             </div>
 
@@ -395,9 +399,13 @@ function Home() {
                         {fmtTime(s.start)}
                       </span>
                       <div
-                        dir="rtl"
-                        className="flex flex-1 flex-wrap justify-end gap-1.5 text-right text-sm leading-relaxed"
-                        style={{ fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }}
+                        dir={script === "arabic" ? "rtl" : "ltr"}
+                        className={`flex flex-1 flex-wrap gap-1.5 text-sm leading-relaxed ${script === "arabic" ? "justify-end text-right" : "justify-start text-left"}`}
+                        style={
+                          script === "arabic"
+                            ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
+                            : undefined
+                        }
                       >
                         {captionWords.length > 0 ? (
                           captionWords.map((w, i) => (
