@@ -515,7 +515,7 @@ function Home() {
                 {!editingFull ? (
                   <button
                     onClick={() => {
-                      setDraftFull(frenchOf(liveTranscript));
+                      setDraftFull(buildDraft());
                       setEditingFull(true);
                     }}
                     className="rounded-lg bg-secondary px-3 py-1 text-xs hover:bg-secondary/80"
