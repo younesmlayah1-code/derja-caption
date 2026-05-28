@@ -200,9 +200,7 @@ function Home() {
                   <Upload className="h-7 w-7" />
                 </div>
                 <h2 className="text-lg font-semibold">Drop your video here</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  MP4, MOV or AVI — up to 500MB
-                </p>
+                <p className="mt-1 text-sm text-muted-foreground">MP4, MOV or AVI — up to 500MB</p>
                 <button
                   onClick={() => inputRef.current?.click()}
                   className="mt-6 rounded-xl px-6 py-3 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.02] active:scale-[0.98]"
@@ -258,12 +256,14 @@ function Home() {
                   </div>
                 )}
 
-
                 {status === "idle" && (
                   <button
                     onClick={run}
                     className="mt-5 w-full rounded-xl py-3 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.01] active:scale-[0.99]"
-                    style={{ background: "var(--gradient-primary)", boxShadow: "var(--shadow-glow)" }}
+                    style={{
+                      background: "var(--gradient-primary)",
+                      boxShadow: "var(--shadow-glow)",
+                    }}
                   >
                     Extract Subtitles
                   </button>
