@@ -201,43 +201,59 @@ function Home() {
   const [editingFull, setEditingFull] = useState(false);
   const [draftFull, setDraftFull] = useState("");
 
+  // Format used in the bulk editor: "[mm:ss] text" per line. The timestamp
+  // prefix is preserved on save so chips never go blank.
+  const parseTimePrefix = (line: string): { start: number | null; text: string } => {
+    const m = line.match(/^\s*\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)$/);
+    if (!m) return { start: null, text: line.trim() };
+    const mm = parseInt(m[1], 10);
+    const ss = parseInt(m[2], 10);
+    const ms = m[3] ? parseInt(m[3].padEnd(3, "0"), 10) / 1000 : 0;
+    return { start: mm * 60 + ss + ms, text: m[4].trim() };
+  };
+
+  const buildDraft = () =>
+    segments.map((s) => `[${fmtTime(s.start)}] ${frenchOf(s.text)}`).join("\n");
+
   const saveFullTranscript = () => {
-    const lines = draftFull.split(/\r?\n/).map((l) => l.trim());
-    // Drop trailing empty lines but keep internal blanks as empty segments? No—drop all empties.
-    const cleaned = lines.filter((l) => l.length > 0);
-    if (cleaned.length === 0) {
+    const rawLines = draftFull.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+    if (rawLines.length === 0) {
       setEditingFull(false);
       return;
     }
+    const parsed = rawLines.map(parseTimePrefix);
     setSegments((prev) => {
       if (prev.length === 0) return prev;
-      const out = prev.slice(0, Math.min(prev.length, cleaned.length)).map((s, i) => ({
-        ...s,
-        text: cleaned[i],
-        words: undefined,
-      }));
-      // If more lines than segments, append extras using last segment's timing as base.
-      if (cleaned.length > prev.length) {
-        const last = prev[prev.length - 1];
-        const dur = Math.max(1, last.end - last.start);
-        let cursor = last.end;
-        let nextId = Math.max(...prev.map((p) => p.id)) + 1;
-        for (let i = prev.length; i < cleaned.length; i++) {
-          out.push({
-            id: nextId++,
-            start: cursor,
-            end: cursor + dur,
-            text: cleaned[i],
-            words: undefined,
-          });
-
-          cursor += dur;
+      const lastEnd = prev[prev.length - 1].end;
+      let nextId = Math.max(...prev.map((p) => p.id)) + 1;
+      return parsed.map((p, i) => {
+        const base = prev[i];
+        const start = p.start != null ? p.start : (base ? base.start : (parsed[i - 1]?.start ?? 0) + 1);
+        // End: keep original if available, else next line's start, else +2s.
+        const nextStart =
+          parsed[i + 1]?.start ?? (prev[i + 1]?.start) ?? (base ? base.end : start + 2);
+        const end = base ? Math.max(start + 0.1, base.end) : Math.max(start + 0.5, nextStart);
+        return {
+          id: base ? base.id : nextId++,
+          start,
+          end: i === parsed.length - 1 && base ? base.end : Math.max(start + 0.1, end),
+          text: p.text,
+          words: undefined,
+        };
+      }).map((s, i, arr) => {
+        // Ensure monotonic timestamps & non-overlapping ends.
+        if (i < arr.length - 1 && s.end > arr[i + 1].start) {
+          return { ...s, end: Math.max(s.start + 0.1, arr[i + 1].start) };
         }
-      }
-      return out;
+        if (i === arr.length - 1) {
+          return { ...s, end: Math.max(s.start + 0.5, lastEnd) };
+        }
+        return s;
+      });
     });
     setEditingFull(false);
   };
+
 
 
 
@@ -499,7 +515,7 @@ function Home() {
                 {!editingFull ? (
                   <button
                     onClick={() => {
-                      setDraftFull(frenchOf(liveTranscript));
+                      setDraftFull(buildDraft());
                       setEditingFull(true);
                     }}
                     className="rounded-lg bg-secondary px-3 py-1 text-xs hover:bg-secondary/80"
@@ -524,18 +540,23 @@ function Home() {
                 )}
               </div>
               {editingFull ? (
-                <textarea
-                  value={draftFull}
-                  onChange={(e) => setDraftFull(e.target.value)}
-                  dir={script === "arabic" ? "rtl" : "ltr"}
-                  rows={Math.min(16, Math.max(4, Math.ceil(draftFull.length / 60)))}
-                  className={`w-full resize-y rounded-md border border-border bg-background/60 p-3 text-base leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary/40 ${script === "arabic" ? "text-right" : "text-left"}`}
-                  style={
-                    script === "arabic"
-                      ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
-                      : undefined
-                  }
-                />
+                <>
+                  <textarea
+                    value={draftFull}
+                    onChange={(e) => setDraftFull(e.target.value)}
+                    dir={script === "arabic" ? "rtl" : "ltr"}
+                    rows={Math.min(16, Math.max(4, Math.ceil(draftFull.length / 60)))}
+                    className={`w-full resize-y rounded-md border border-border bg-background/60 p-3 text-base leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary/40 ${script === "arabic" ? "text-right" : "text-left"}`}
+                    style={
+                      script === "arabic"
+                        ? { fontFamily: "'Noto Naskh Arabic', system-ui, sans-serif" }
+                        : undefined
+                    }
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground/70">
+                    Keep the <code className="rounded bg-secondary/60 px-1">[mm:ss]</code> at the start of each line to preserve timestamps.
+                  </p>
+                </>
               ) : (
                 <p
                   dir={script === "arabic" ? "rtl" : "ltr"}
@@ -549,6 +570,7 @@ function Home() {
                   {frenchOf(liveTranscript)}
                 </p>
               )}
+
             </div>
 
 
