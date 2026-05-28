@@ -19,7 +19,9 @@ function fmtVtt(t: number) {
 }
 
 function flattenWords(segments: Segment[], words?: Word[]): Word[] {
-  if (words && words.length > 0) return words.filter((w) => w.text).sort((a, b) => a.start - b.start);
+  if (words && words.length > 0) {
+    return words.filter((w) => w.text).sort((a, b) => a.start - b.start);
+  }
   const out: { start: number; end: number; text: string }[] = [];
   for (const s of segments) {
     if (s.words && s.words.length > 0) {
