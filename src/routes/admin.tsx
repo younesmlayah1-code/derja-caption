@@ -257,6 +257,7 @@ function AdminPanel() {
           <h1 className="text-2xl font-semibold">Admin panel</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <BetaAccessButton />
           <Link
             to="/"
             className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-sm hover:bg-accent"
