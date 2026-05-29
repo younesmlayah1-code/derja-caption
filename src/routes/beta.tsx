@@ -604,62 +604,120 @@ function BetaApp() {
 
         {/* ─── STEP 3: AI clip ─── */}
         {segments.length > 0 && (
-          <Step number={3} title="AI-picked clip (1.5–3 min)" done={!!clip}>
-            {!clip ? (
-              <button
-                onClick={() => suggestClip(false)}
-                disabled={clipLoading}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              >
-                {clipLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Scissors className="h-4 w-4" />
-                )}
-                Find best clip
-              </button>
-            ) : (
-              <div className="space-y-3">
-                <div className="overflow-hidden rounded-xl border border-border bg-black">
-                  <video
-                    ref={videoRef}
-                    src={videoUrl}
-                    className="block max-h-[60vh] w-full"
-                    controls
-                  />
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <button
-                    onClick={togglePlay}
-                    className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 font-medium text-primary-foreground"
-                  >
-                    {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                    {playing ? "Pause" : "Play clip"}
-                  </button>
-                  <span className="rounded-md bg-primary/15 px-2 py-1 font-mono text-primary">
-                    {fmtTime(clip.start)} → {fmtTime(clip.end)} · {Math.round(clip.end - clip.start)}s
-                  </span>
-                  <button
-                    onClick={() => suggestClip(true)}
-                    disabled={clipLoading}
-                    className="ml-auto inline-flex items-center gap-1 rounded-lg border border-border bg-background/60 px-3 py-1.5 font-medium hover:border-primary/50 hover:bg-primary/10 disabled:opacity-50"
-                  >
-                    {clipLoading ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    )}
-                    Try another
-                  </button>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{clip.title}</p>
-                  {clip.reason && <p className="text-xs text-muted-foreground">{clip.reason}</p>}
+          <Step number={3} title="Pick the clip" done={!!clip}>
+            <div className="space-y-3">
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">Target duration</p>
+                <div className="flex flex-wrap gap-2">
+                  {[30, 60, 90, 120, 150, 180].map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => {
+                        setTargetDuration(d);
+                        setManualEnd(((parseFloat(manualStart) || 0) + d).toFixed(1));
+                      }}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        targetDuration === d
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-card/40 text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {d}s
+                    </button>
+                  ))}
                 </div>
               </div>
-            )}
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => { setManualMode(false); void suggestClip(!!clip); }}
+                  disabled={clipLoading}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {clipLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : clip ? <RefreshCw className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                  {clip ? "Try another (AI)" : "Find best clip with AI"}
+                </button>
+                <button
+                  onClick={() => setManualMode((v) => !v)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-card/40 px-4 py-2 text-sm font-medium hover:border-primary/50"
+                >
+                  <Scissors className="h-4 w-4" />
+                  {manualMode ? "Hide manual" : "Pick manually"}
+                </button>
+              </div>
+
+              {manualMode && (
+                <div className="rounded-xl border border-border bg-card/40 p-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      Start (s)
+                      <input
+                        type="number"
+                        min={0}
+                        max={totalDuration}
+                        step={0.1}
+                        value={manualStart}
+                        onChange={(e) => setManualStart(e.target.value)}
+                        className="rounded-lg border border-border bg-background/80 px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      End (s)
+                      <input
+                        type="number"
+                        min={0}
+                        max={totalDuration}
+                        step={0.1}
+                        value={manualEnd}
+                        onChange={(e) => setManualEnd(e.target.value)}
+                        className="rounded-lg border border-border bg-background/80 px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
+                      />
+                    </label>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Total: {fmtTime(totalDuration)} · Selected: {Math.max(0, (parseFloat(manualEnd) || 0) - (parseFloat(manualStart) || 0)).toFixed(1)}s
+                  </p>
+                  <button
+                    onClick={applyManualClip}
+                    className="mt-2 w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                  >
+                    Use this range
+                  </button>
+                </div>
+              )}
+
+              {clip && (
+                <div className="space-y-3 pt-2">
+                  <div className="overflow-hidden rounded-xl border border-border bg-black">
+                    <video
+                      ref={videoRef}
+                      src={videoUrl}
+                      className="block max-h-[60vh] w-full"
+                      controls
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <button
+                      onClick={togglePlay}
+                      className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 font-medium text-primary-foreground"
+                    >
+                      {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                      {playing ? "Pause" : "Play clip"}
+                    </button>
+                    <span className="rounded-md bg-primary/15 px-2 py-1 font-mono text-primary">
+                      {fmtTime(clip.start)} → {fmtTime(clip.end)} · {Math.round(clip.end - clip.start)}s
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{clip.title}</p>
+                    {clip.reason && <p className="text-xs text-muted-foreground">{clip.reason}</p>}
+                  </div>
+                </div>
+              )}
+            </div>
           </Step>
         )}
+
 
         {/* ─── STEP 4: language ─── */}
         {clip && (
