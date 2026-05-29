@@ -23,6 +23,13 @@ type Props = {
 
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
 
+function fmtTime(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r.toString().padStart(2, "0")}`;
+}
+
 function isVideoFile(f: File | null): boolean {
   if (!f) return false;
   return f.type.startsWith("video/") || /\.(mp4|mov|webm|avi|mkv)$/i.test(f.name);
