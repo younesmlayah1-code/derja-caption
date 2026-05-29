@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toSrt, fmtTime, downloadFile, segmentToWordCues, type Segment } from "@/lib/subtitles";
 import { transcribeFile } from "@/lib/transcribe";
+import { authedFetch } from "@/lib/api-client";
 import { AccessGate } from "@/components/AccessGate";
 
 export const Route = createFileRoute("/beta")({
