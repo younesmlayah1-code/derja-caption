@@ -173,8 +173,29 @@ function AdminPanel() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
+  const resetPw = useMutation({
+    mutationFn: (vars: { userId: string; password: string }) =>
+      adminResetUserPassword({ data: vars }),
+  });
+
   const grantPlan = (userId: string, months: number | null) => {
     update.mutate({ userId, plan: "pro", active: true, durationMonths: months });
+  };
+
+  const handleResetPw = (userId: string, email: string) => {
+    const pw = window.prompt(`Set a new password for ${email} (min 6 chars):`);
+    if (!pw) return;
+    if (pw.length < 6) {
+      alert("Password must be at least 6 characters.");
+      return;
+    }
+    resetPw.mutate(
+      { userId, password: pw },
+      {
+        onSuccess: () => alert(`Password updated for ${email}.`),
+        onError: (e) => alert((e as Error).message),
+      },
+    );
   };
 
   return (
