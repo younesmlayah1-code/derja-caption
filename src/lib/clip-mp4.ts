@@ -268,18 +268,36 @@ function pickRecorderMime() {
   );
 }
 
-function waitForVideoEvent(video: HTMLVideoElement, event: keyof HTMLMediaElementEventMap) {
+function waitForVideoEvent(
+  video: HTMLVideoElement,
+  event: keyof HTMLMediaElementEventMap,
+  timeoutMs = 15000,
+) {
   return new Promise<void>((resolve, reject) => {
+    let timer = 0;
     const onOk = () => cleanup(resolve);
     const onError = () => cleanup(() => reject(new Error(`Video ${event} failed.`)));
     const cleanup = (finish: () => void) => {
+      if (timer) window.clearTimeout(timer);
       video.removeEventListener(event, onOk);
       video.removeEventListener("error", onError);
       finish();
     };
     video.addEventListener(event, onOk, { once: true });
     video.addEventListener("error", onError, { once: true });
+    timer = window.setTimeout(
+      () => cleanup(() => reject(new Error(`Timed out waiting for video ${event}.`))),
+      timeoutMs,
+    );
   });
+}
+
+async function seekVideo(video: HTMLVideoElement, seconds: number) {
+  const target = Math.max(0, Math.min(seconds, Math.max(0, (video.duration || seconds) - 0.05)));
+  if (Math.abs(video.currentTime - target) < 0.05) return;
+  const seeked = waitForVideoEvent(video, "seeked", 12000);
+  video.currentTime = target;
+  await seeked;
 }
 
 async function recordClipFallback(
@@ -301,15 +319,16 @@ async function recordClipFallback(
   video.src = url;
   video.preload = "auto";
   video.playsInline = true;
+  video.muted = true;
   video.volume = 0;
   video.style.cssText =
     "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
   document.body.appendChild(video);
 
   try {
-    await waitForVideoEvent(video, "loadedmetadata");
-    video.currentTime = Math.max(0, Math.min(startSec, Math.max(0, video.duration - 0.1)));
-    await waitForVideoEvent(video, "seeked");
+    if (video.readyState < 1) await waitForVideoEvent(video, "loadedmetadata");
+    await seekVideo(video, startSec);
+    if (video.readyState < 2) await waitForVideoEvent(video, "loadeddata", 12000);
 
     const stream =
       (video as HTMLVideoElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream })
