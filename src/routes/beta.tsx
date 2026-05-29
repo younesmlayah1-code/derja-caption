@@ -569,9 +569,31 @@ function BetaApp() {
           )}
         </Step>
 
-        {/* ─── STEP 2: transcribe ─── */}
+        {/* ─── STEP 2: language ─── */}
         {file && (
-          <Step number={2} title="Transcribe" done={segments.length > 0}>
+          <Step number={2} title="Caption language" done={!!lang}>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {(Object.keys(LANG_LABELS) as Lang[]).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
+                    lang === l
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card/40 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Languages className="h-3.5 w-3.5" />
+                  {LANG_LABELS[l]}
+                </button>
+              ))}
+            </div>
+          </Step>
+        )}
+
+        {/* ─── STEP 3: transcribe ─── */}
+        {file && lang && (
+          <Step number={3} title="Transcribe" done={segments.length > 0}>
             {segments.length === 0 ? (
               <div className="space-y-3">
                 {busy ? (
@@ -602,9 +624,9 @@ function BetaApp() {
           </Step>
         )}
 
-        {/* ─── STEP 3: AI clip ─── */}
+        {/* ─── STEP 4: AI clip ─── */}
         {segments.length > 0 && (
-          <Step number={3} title="Pick the clip" done={!!clip}>
+          <Step number={4} title="Pick the clip" done={!!clip}>
             <div className="space-y-3">
               <div>
                 <p className="mb-2 text-xs font-medium text-muted-foreground">Target duration</p>
@@ -714,29 +736,6 @@ function BetaApp() {
                   </div>
                 </div>
               )}
-            </div>
-          </Step>
-        )}
-
-
-        {/* ─── STEP 4: language ─── */}
-        {clip && (
-          <Step number={4} title="Caption language" done={true}>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {(Object.keys(LANG_LABELS) as Lang[]).map((l) => (
-                <button
-                  key={l}
-                  onClick={() => setLang(l)}
-                  className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
-                    lang === l
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card/40 text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Languages className="h-3.5 w-3.5" />
-                  {LANG_LABELS[l]}
-                </button>
-              ))}
             </div>
           </Step>
         )}
