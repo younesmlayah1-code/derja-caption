@@ -1,20 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { geminiChat } from "@/lib/gemini.server";
-import { Buffer } from "buffer";
 
 export const Route = createFileRoute("/api/transcribe")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         const apiKey = process.env.GROQ_API_KEY;
-        const geminiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey && !geminiKey) {
+        if (!apiKey) {
           return Response.json(
-            { error: "No transcription provider configured (GROQ_API_KEY or GEMINI_API_KEY)." },
+            { error: "Whisper transcription provider is not configured (GROQ_API_KEY)." },
             { status: 500 },
           );
         }
-
 
         let incoming: FormData;
         try {
@@ -39,49 +36,15 @@ export const Route = createFileRoute("/api/transcribe")({
           );
         }
 
-        // ---------- PRIMARY PATH: Gemini-on-audio ----------
-        // Whisper consistently mangles French/English code-switching in Derja.
-        // Gemini 2.5 handles native code-switching well — use it as the
-        // primary transcriber and return its timed segments directly.
-        if (geminiKey) {
-          try {
-            const result = await transcribeWithGemini(file, geminiKey);
-            if (result && result.segments.length > 0) {
-              return Response.json({
-                text: result.text,
-                segments: result.segments,
-                words: result.segments.flatMap((s) => s.words ?? []),
-                rate: {
-                  limitAudioSeconds: null,
-                  remainingAudioSeconds: null,
-                  resetAudioSeconds: null,
-                  limitRequests: null,
-                  remainingRequests: null,
-                },
-              });
-            }
-          } catch (e) {
-            console.error("Gemini primary transcription failed, falling back to Groq:", e);
-          }
-        }
-
-        if (!apiKey) {
-          return Response.json(
-            { error: "Gemini transcription failed and GROQ_API_KEY fallback is not configured." },
-            { status: 500 },
-          );
-        }
-
-        // ---------- FALLBACK PATH: Groq Whisper + polish ----------
+        // ---------- PRIMARY PATH: Whisper + AI correction ----------
         // Derja-biased prompt: keep Tunisian Arabic as Derja, but preserve
         // code-switched French/English words in Latin letters instead of
         // forcing everything into Arabic script.
         const derjaPrompt =
           "فرّغ الكلام باللهجة التونسية الدارجة كما هو، لا تحوّله للفصحى. " +
           "الكلام العربي/الدارجة اكتبه بالحروف العربية، لكن أي كلمة فرنسية أو إنجليزية منطوقة اكتبها بلغتها الأصلية وبحروف Latin، لا تكتبها بحروف عربية. " +
-          "أمثلة فرنسي/إنجليزي لازم تبقى Latin: produit, montage, business, marketing, problème, service, réseau, rendez-vous, téléphone, ordinateur, boutique, email, wifi, download, link. " +
+          "أمثلة فرنسي/إنجليزي لازم تبقى Latin: lycée, école, produit, montage, business, marketing, problème, service, réseau, rendez-vous, téléphone, ordinateur, boutique, email, wifi, download, link. " +
           "أمثلة كلمات دارجة تبقى عربية: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، باهي، موش، ماكش، توا، يعيشك، زادا، خاطر، نحب، نجم، نمشي، نشوف، نحكي، فما، أما، إيا.";
-
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
@@ -111,17 +74,6 @@ export const Route = createFileRoute("/api/transcribe")({
           segments?: Array<{ id?: number; start: number; end: number; text: string }>;
           words?: Array<{ word?: string; text?: string; start: number; end: number }>;
         };
-
-        // Second-pass ASR: use a stronger transcript-only model as the source
-        // of truth, then align it back onto Groq's timestamps. This is far more
-        // reliable for Tunisian Derja with French/English code-switching than
-        // trying to repair badly-spelled words one-by-one after Whisper.
-        const highAccuracyText = await transcribeHighAccuracyText(file, derjaPrompt).catch(
-          (e: unknown) => {
-            console.error("high-accuracy transcription failed, using Groq transcript:", e);
-            return "";
-          },
-        );
 
         const allWords = (data.words ?? [])
           .map((w) => ({
@@ -164,23 +116,14 @@ export const Route = createFileRoute("/api/transcribe")({
         // Drop segments that became empty after dedupe.
         const segments = rawSegments.filter((s) => s.text.length > 0);
 
-        const referenceSegments: PolishSeg[] = highAccuracyText
-          ? await alignSegmentsToReference(segments, highAccuracyText).catch((e: unknown) => {
-              console.error("alignSegmentsToReference failed, using weighted split:", e);
-              return splitReferenceBySegmentWeights(segments, highAccuracyText);
-            })
-          : segments;
-
         // Polish spelling, spacing, and punctuation with the configured AI while
         // preserving the original Derja words and meaning. Failures here are
         // non-fatal — we fall back to the raw Whisper output.
         const polishedSegments: PolishSeg[] = (
-          highAccuracyText
-            ? referenceSegments
-            : await polishSegments(referenceSegments).catch((e: unknown) => {
-                console.error("polishSegments failed:", e);
-                return referenceSegments;
-              })
+          await polishSegments(segments).catch((e: unknown) => {
+            console.error("polishSegments failed:", e);
+            return segments;
+          })
         ).map(syncWordsToSegmentText);
 
         const fullText =
@@ -408,143 +351,6 @@ function syncWordsToSegmentText(seg: PolishSeg): PolishSeg {
   };
 }
 
-async function transcribeHighAccuracyText(file: File, prompt: string): Promise<string> {
-  const openAiKey = process.env.OPENAI_API_KEY;
-  if (openAiKey) {
-    const upstream = new FormData();
-    upstream.append("file", file, file.name || "audio.wav");
-    upstream.append("model", "gpt-4o-transcribe");
-    upstream.append("response_format", "json");
-    upstream.append(
-      "prompt",
-      `${prompt}\n\nReturn a clean verbatim transcript. Keep Tunisian Derja in Arabic script. Write French/English words in correct Latin spelling with accents, for example lycée, école, problème, rendez-vous, téléphone.`,
-    );
-
-    const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${openAiKey}` },
-      body: upstream,
-    });
-    if (res.ok) {
-      const json = (await res.json()) as { text?: string };
-      const text = normalizeTranscript(json.text ?? "");
-      if (text) return text;
-    } else {
-      console.error(
-        `OpenAI transcription failed (${res.status}):`,
-        (await res.text()).slice(0, 500),
-      );
-    }
-  }
-
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey) return "";
-  const audioBase64 = Buffer.from(await file.arrayBuffer()).toString("base64");
-  const mimeType = file.type || "audio/wav";
-  const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text:
-              `${prompt}\n\nTranscribe this audio accurately. Output only the transcript text. ` +
-              "Keep Tunisian Derja in Arabic script and write all French/English words in correct Latin spelling with accents, e.g. lycée not ليسي or lyci.",
-          },
-          { inlineData: { mimeType, data: audioBase64 } },
-        ],
-      },
-    ],
-    generationConfig: { temperature: 0 },
-  };
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(geminiKey)}`,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
-  );
-  if (!res.ok)
-    throw new Error(
-      `Gemini audio transcription failed (${res.status}): ${(await res.text()).slice(0, 300)}`,
-    );
-  const json = (await res.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  return normalizeTranscript(
-    json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join(" ") ?? "",
-  );
-}
-
-function normalizeTranscript(input: string): string {
-  return normalizeLoanwords(dedupeRepeats(input.replace(/^```(?:text)?|```$/g, "").trim()));
-}
-
-async function alignSegmentsToReference(
-  segments: PolishSeg[],
-  referenceText: string,
-): Promise<PolishSeg[]> {
-  if (segments.length === 0 || !referenceText.trim()) return segments;
-  const payload = segments.map((s) => ({
-    id: s.id,
-    start: s.start,
-    end: s.end,
-    roughText: s.text,
-  }));
-  const content = await geminiChat({
-    model: "gemini-2.5-flash",
-    jsonMode: true,
-    temperature: 0,
-    system:
-      "You align a corrected transcript to existing subtitle timestamps. Return JSON only. " +
-      "Do not translate or rewrite. Split the corrected transcript across the provided segment ids in order. " +
-      "Keep Derja Arabic in Arabic script and French/English words in correct Latin spelling.",
-    user: JSON.stringify({ correctedTranscript: referenceText, segments: payload }),
-  });
-  const parsed = parseJsonArray(content);
-  if (!parsed.length) return splitReferenceBySegmentWeights(segments, referenceText);
-  const byId = new Map<number, string>();
-  for (const item of parsed) {
-    if (typeof item.id === "number" && typeof item.text === "string")
-      byId.set(item.id, normalizeTranscript(item.text));
-  }
-  return segments.map((s) => ({ ...s, text: byId.get(s.id) || s.text }));
-}
-
-function splitReferenceBySegmentWeights(segments: PolishSeg[], referenceText: string): PolishSeg[] {
-  const tokens = normalizeTranscript(referenceText).split(/\s+/).filter(Boolean);
-  if (!tokens.length || !segments.length) return segments;
-  const weights = segments.map((s) => Math.max(1, s.text.split(/\s+/).filter(Boolean).length));
-  const total = weights.reduce((sum, n) => sum + n, 0);
-  let cursor = 0;
-  return segments.map((s, i) => {
-    const remainingSegments = segments.length - i;
-    const remainingTokens = tokens.length - cursor;
-    const wanted =
-      i === segments.length - 1
-        ? remainingTokens
-        : Math.max(1, Math.round((tokens.length * weights[i]) / total));
-    const count = Math.min(
-      Math.max(1, wanted),
-      Math.max(1, remainingTokens - remainingSegments + 1),
-    );
-    const text = tokens.slice(cursor, cursor + count).join(" ");
-    cursor += count;
-    return { ...s, text: text || s.text };
-  });
-}
-
-function parseJsonArray(content: string): Array<{ id?: number; text?: string }> {
-  try {
-    const parsed = JSON.parse(content) as unknown;
-    if (Array.isArray(parsed)) return parsed as Array<{ id?: number; text?: string }>;
-    const wrapped = parsed as { segments?: unknown };
-    if (Array.isArray(wrapped.segments))
-      return wrapped.segments as Array<{ id?: number; text?: string }>;
-  } catch {
-    const match = content.match(/\[[\s\S]*\]/);
-    if (match) return parseJsonArray(match[0]);
-  }
-  return [];
-}
-
 // Use the configured AI to fix spelling, spacing and punctuation in Derja segments
 // while preserving the original wording and meaning. Returns same shape with
 // cleaned text. Throws on hard failure; caller falls back to raw segments.
@@ -707,141 +513,3 @@ function dedupeRepeats(input: string): string {
     .replace(/\s+([،.؟!,?.])/g, "$1")
     .trim();
 }
-
-// ---------- Gemini-on-audio primary transcriber ----------
-// Uses Gemini 2.5 to transcribe audio directly into timed segments. Far
-// better than Whisper for Tunisian Derja with French/English code-switching
-// because Gemini natively understands both scripts in the same sentence.
-type GeminiSeg = {
-  id: number;
-  start: number;
-  end: number;
-  text: string;
-  words?: Array<{ start: number; end: number; text: string }>;
-};
-
-async function transcribeWithGemini(
-  file: File,
-  geminiKey: string,
-): Promise<{ text: string; segments: GeminiSeg[] } | null> {
-  const audioBase64 = Buffer.from(await file.arrayBuffer()).toString("base64");
-  const mimeType = file.type || "audio/wav";
-
-  const instructions =
-    "You are an expert transcriber of Tunisian Derja (Arabic dialect) with French/English code-switching.\n\n" +
-    "TASK: Transcribe the audio into timed subtitle segments (~3-7 seconds each, max ~12 words).\n\n" +
-    "CRITICAL LANGUAGE RULES:\n" +
-    "- Tunisian Derja / Arabic words → write in ARABIC SCRIPT (برشا، ياسر، شنوة، باهي، موش، نحب، نمشي...).\n" +
-    "- French words → write in proper French Latin spelling WITH accents (lycée NOT ليسي/lyci, école NOT إيكول, problème, téléphone, rendez-vous, déjà, café, université, baccalauréat, médecin, hôpital, contrôle, réservation, sécurité, écran, sécurité...).\n" +
-    "- English words → write in proper English spelling (business, marketing, wifi, email, download, computer, link, password...).\n" +
-    "- NEVER transliterate French/English into Arabic letters. NEVER write phonetic Latin like 'lyci' instead of 'lycée'.\n" +
-    "- Keep Derja as Derja. DO NOT convert to Modern Standard Arabic.\n" +
-    "- Add proper punctuation (،.؟! for Arabic, ,.?! for Latin).\n\n" +
-    "OUTPUT: Return ONLY valid JSON, no markdown, no commentary:\n" +
-    '{"segments":[{"start":0.0,"end":3.2,"text":"..."}]}\n' +
-    "Timestamps in seconds (floats). Segments must be in chronological order and cover the whole audio.";
-
-  const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: instructions },
-          { inlineData: { mimeType, data: audioBase64 } },
-        ],
-      },
-    ],
-    generationConfig: {
-      temperature: 0,
-      responseMimeType: "application/json",
-    },
-  };
-
-  // Try pro first for best accuracy, fall back to flash on quota/error.
-  const models = ["gemini-2.5-pro", "gemini-2.5-flash"];
-  let raw = "";
-  let lastErr: unknown = null;
-  for (const model of models) {
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
-      );
-      if (!res.ok) {
-        lastErr = new Error(`${model} ${res.status}: ${(await res.text()).slice(0, 200)}`);
-        console.error("Gemini transcription:", lastErr);
-        continue;
-      }
-      const json = (await res.json()) as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      };
-      raw = (json.candidates?.[0]?.content?.parts ?? [])
-        .map((p) => p?.text ?? "")
-        .join("")
-        .trim();
-      if (raw) break;
-    } catch (e) {
-      lastErr = e;
-      console.error(`Gemini ${model} threw:`, e);
-    }
-  }
-  if (!raw) {
-    if (lastErr) throw lastErr;
-    return null;
-  }
-
-  // Parse — accept either { segments: [...] } or a bare array.
-  const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stripped);
-  } catch {
-    const m = stripped.match(/[{[][\s\S]*[}\]]/);
-    if (!m) return null;
-    parsed = JSON.parse(m[0]);
-  }
-  const arr = Array.isArray(parsed)
-    ? (parsed as Array<{ start?: number; end?: number; text?: string }>)
-    : Array.isArray((parsed as { segments?: unknown }).segments)
-      ? (parsed as { segments: Array<{ start?: number; end?: number; text?: string }> }).segments
-      : [];
-
-  if (arr.length === 0) return null;
-
-  const segments: GeminiSeg[] = arr
-    .filter(
-      (s) =>
-        typeof s.start === "number" &&
-        typeof s.end === "number" &&
-        typeof s.text === "string" &&
-        s.text.trim().length > 0,
-    )
-    .map((s, i) => {
-      const text = (s.text as string).trim();
-      const tokens = text.split(/\s+/).filter(Boolean);
-      const dur = Math.max(0.001, (s.end as number) - (s.start as number));
-      const step = dur / Math.max(1, tokens.length);
-      const words = tokens.map((t, idx) => ({
-        start: (s.start as number) + step * idx,
-        end: (s.start as number) + step * (idx + 1),
-        text: t,
-      }));
-      return {
-        id: i,
-        start: s.start as number,
-        end: s.end as number,
-        text,
-        words,
-      };
-    });
-
-  if (segments.length === 0) return null;
-
-  const text = segments.map((s) => s.text).join(" ").trim();
-  return { text, segments };
-}
-

@@ -1,8 +1,8 @@
-// Direct Google Gemini API helper (uses GEMINI_API_KEY).
-// Drop-in replacement for the OpenAI-compat Lovable AI Gateway chat call.
+// AI chat helper. Prefer Lovable AI Gateway, fall back to direct Gemini if configured.
 
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
-const DEFAULT_MODEL = "gemini-2.5-flash";
+const LOVABLE_AI_ENDPOINT = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const DEFAULT_MODEL = "google/gemini-3-flash-preview";
 
 export async function geminiChat(opts: {
   system: string;
@@ -11,10 +11,43 @@ export async function geminiChat(opts: {
   temperature?: number;
   model?: string;
 }): Promise<string> {
+  const lovableKey = process.env.LOVABLE_API_KEY;
+  if (lovableKey) {
+    const res = await fetch(LOVABLE_AI_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: opts.model ?? DEFAULT_MODEL,
+        messages: [
+          { role: "system", content: opts.system },
+          { role: "user", content: opts.user },
+        ],
+        temperature: opts.temperature ?? 0,
+        ...(opts.jsonMode ? { response_format: { type: "json_object" } } : {}),
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(
+        `Lovable AI Gateway failed (${res.status}): ${(await res.text()).slice(0, 300)}`,
+      );
+    }
+
+    const json = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    return json.choices?.[0]?.message?.content?.trim() ?? "";
+  }
+
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not configured.");
 
-  const model = opts.model ?? DEFAULT_MODEL;
+  const model = (opts.model ?? "google/gemini-2.5-flash").replace(/^google\//, "");
+  if (!model.startsWith("gemini-"))
+    throw new Error(`Model ${opts.model} requires LOVABLE_API_KEY.`);
   const url = `${ENDPOINT}/${model}:generateContent?key=${encodeURIComponent(key)}`;
 
   const body: Record<string, unknown> = {
@@ -40,5 +73,8 @@ export async function geminiChat(opts: {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
   };
   const parts = j.candidates?.[0]?.content?.parts ?? [];
-  return parts.map((p) => p?.text ?? "").join("").trim();
+  return parts
+    .map((p) => p?.text ?? "")
+    .join("")
+    .trim();
 }
