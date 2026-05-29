@@ -30,14 +30,6 @@ export const Route = createFileRoute("/account")({
   component: AccountPage,
 });
 
-const PLANS = [
-  { label: "1 Month", duration: "30 days of access", price: "15 TND" },
-  { label: "3 Months", duration: "90 days of access", price: "40 TND", badge: "Popular" },
-  { label: "6 Months", duration: "180 days of access", price: "70 TND" },
-  { label: "12 Months", duration: "365 days of access", price: "120 TND", badge: "Best value" },
-  { label: "Unlimited", duration: "Lifetime access", price: "250 TND" },
-];
-
 function AccountPage() {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
@@ -46,6 +38,11 @@ function AccountPage() {
     queryKey: ["my-access", session?.user.id],
     queryFn: () => getMyAccess(),
     enabled: !!session,
+  });
+
+  const { data: plans = [] } = useQuery({
+    queryKey: ["plans"],
+    queryFn: () => getPlans(),
   });
 
   if (loading || (session && isLoading)) {
