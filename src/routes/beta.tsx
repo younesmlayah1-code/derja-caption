@@ -746,7 +746,7 @@ function BetaApp() {
             {translating ? (
               <div className="flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-6 text-sm text-primary">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Translating to {LANG_LABELS[lang]}…
+                Translating to {lang ? LANG_LABELS[lang] : "selected language"}…
               </div>
             ) : (
               <div className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
