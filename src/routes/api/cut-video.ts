@@ -27,7 +27,8 @@ export const Route = createFileRoute("/api/cut-video")({
           }
 
           const clip = await cutWithServerFFmpeg(source, start, end, request.url);
-          return new Response(clip, {
+          const body = clip.buffer.slice(clip.byteOffset, clip.byteOffset + clip.byteLength);
+          return new Response(body, {
             status: 200,
             headers: {
               "content-type": "video/mp4",
@@ -68,8 +69,8 @@ async function cutWithServerFFmpeg(
   requestUrl: string,
 ): Promise<Uint8Array> {
   const logs: string[] = [];
-  const g = globalThis as typeof globalThis & { self?: unknown; location?: unknown };
-  g.self ??= g;
+  const g = globalThis as unknown as Record<string, unknown>;
+  g.self ??= globalThis;
   g.location ??= { href: requestUrl };
 
   const wasmRes = await fetch(new URL("/ffmpeg/ffmpeg-core.wasm", requestUrl));
