@@ -444,7 +444,7 @@ function BetaApp() {
   };
 
   const downloadBlob = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(cutBlob);
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;
@@ -829,7 +829,7 @@ function BetaApp() {
         {/* ─── STEP 6: export ─── */}
         {clip && clipSegments.length > 0 && (
           <Step number={6} title="Download">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <button
                 onClick={exportSrt}
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card/60 px-4 py-3 text-sm font-medium hover:border-primary/50 hover:bg-primary/10"
@@ -854,6 +854,8 @@ function BetaApp() {
                       {cutting.stage === "loading" && "Loading encoder…"}
                       {cutting.stage === "cutting" &&
                         `Cutting${cutting.pct != null ? ` ${Math.round(cutting.pct * 100)}%` : "…"}`}
+                      {cutting.stage === "recording" &&
+                        `Recording fallback${cutting.pct != null ? ` ${Math.round(cutting.pct * 100)}%` : "…"}`}
                       {cutting.stage === "done" && "Ready"}
                     </>
                   ) : (
@@ -876,9 +878,17 @@ function BetaApp() {
                   Download MP4 ({(cutBlob.size / 1024 / 1024).toFixed(1)} MB)
                 </button>
               )}
+
+              <button
+                onClick={downloadFullVideo}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card/60 px-4 py-3 text-sm font-medium hover:border-primary/50 hover:bg-primary/10"
+              >
+                <FileVideo className="h-4 w-4" />
+                Download full video
+              </button>
             </div>
             <p className="mt-2 text-xs text-muted-foreground/70">
-              MP4 cut runs in your browser (first cut downloads ~30MB encoder).
+              Clip export first tries MP4 cutting, then a browser recording fallback if needed.
             </p>
           </Step>
         )}
