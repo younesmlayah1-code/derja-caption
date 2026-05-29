@@ -318,6 +318,19 @@ function BetaApp() {
       }));
   }, [segments, clip]);
 
+  const captionSegments = useMemo<Segment[]>(() => {
+    if (captionMode === "line") return clipSegments;
+    let id = 0;
+    return clipSegments.flatMap((s) =>
+      segmentToWordCues(s).map((w) => ({
+        id: ++id,
+        start: w.start,
+        end: w.end,
+        text: w.text,
+      })),
+    );
+  }, [clipSegments, captionMode]);
+
   // ------- Translation maps (clip-scoped) -------
   const [englishMap, setEnglishMap] = useState<Map<string, string>>(new Map());
   const [frenchMap, setFrenchMap] = useState<Map<string, string>>(new Map()); // french translation
@@ -325,10 +338,10 @@ function BetaApp() {
   const [translating, setTranslating] = useState(false);
 
   useEffect(() => {
-    if (!lang || !clip || clipSegments.length === 0) return;
+    if (!lang || !clip || captionSegments.length === 0) return;
     if (lang === "derja-ar") return;
 
-    const texts = clipSegments.map((s) => s.text).filter(Boolean);
+    const texts = captionSegments.map((s) => s.text).filter(Boolean);
     let url = "";
     let body: Record<string, unknown> = {};
     let target: Map<string, string>;
@@ -338,12 +351,12 @@ function BetaApp() {
       target = englishMap;
       setTarget = setEnglishMap;
       url = "/api/translate-en";
-      body = { mode: "line", targetLang: "english" };
+      body = { mode: captionMode, targetLang: "english" };
     } else if (lang === "french") {
       target = frenchMap;
       setTarget = setFrenchMap;
       url = "/api/translate-en";
-      body = { mode: "line", targetLang: "french" };
+      body = { mode: captionMode, targetLang: "french" };
     } else {
       target = frenchDerjaMap;
       setTarget = setFrenchDerjaMap;
@@ -380,7 +393,7 @@ function BetaApp() {
     return () => {
       cancelled = true;
     };
-  }, [lang, clipSegments, clip, englishMap, frenchMap, frenchDerjaMap]);
+  }, [lang, captionSegments, captionMode, clip, englishMap, frenchMap, frenchDerjaMap]);
 
   const baseTextFor = (s: Segment): string => {
     if (!lang || lang === "derja-ar") return s.text;
@@ -393,12 +406,12 @@ function BetaApp() {
   // Override key = `${lang}:${id}` so edits per language stay separate.
   const [overrides, setOverrides] = useState<Map<string, string>>(new Map());
   const displayFor = (s: Segment): string =>
-    overrides.get(`${lang ?? "derja-ar"}:${s.id}`) ?? baseTextFor(s);
+    overrides.get(`${captionMode}:${lang ?? "derja-ar"}:${s.id}`) ?? baseTextFor(s);
 
   const updateSegment = (id: number, value: string) => {
     setOverrides((prev) => {
       const next = new Map(prev);
-      next.set(`${lang ?? "derja-ar"}:${id}`, value);
+      next.set(`${captionMode}:${lang ?? "derja-ar"}:${id}`, value);
       return next;
     });
   };
