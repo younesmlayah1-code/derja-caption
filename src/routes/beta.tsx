@@ -93,7 +93,7 @@ function BetaApp() {
     setError(null);
     setYtLoading(true);
     try {
-      const res = await fetch("/api/youtube-fetch", {
+      const res = await authedFetch("/api/youtube-fetch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: ytUrl.trim() }),
@@ -170,7 +170,7 @@ function BetaApp() {
         regenerate && clip ? [...triedRanges, { start: clip.start, end: clip.end }] : [];
       const minSec = Math.max(15, targetDuration - 10);
       const maxSec = targetDuration + 10;
-      const res = await fetch("/api/suggest-clip", {
+      const res = await authedFetch("/api/suggest-clip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -391,7 +391,7 @@ function BetaApp() {
       form.append("file", file, file.name || "video.mp4");
       form.append("start", String(clip.start));
       form.append("end", String(clip.end));
-      const res = await fetch("/api/cut-video", { method: "POST", body: form });
+      const res = await authedFetch("/api/cut-video", { method: "POST", body: form });
       if (!res.ok) {
         let msg = `Server export failed (${res.status}).`;
         try {
