@@ -60,6 +60,25 @@ function splitLongSegments(segs: Segment[]): Segment[] {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
+      { title: "Derja Caption — AI Tunisian Arabic subtitles" },
+      {
+        name: "description",
+        content: "Extract Tunisian Arabic (Derja) subtitles from your videos with AI.",
+      },
+    ],
+  }),
+  component: HomeGated,
+});
+
+function HomeGated() {
+  return (
+    <AccessGate>
+      <Home />
+    </AccessGate>
+  );
+}
+  head: () => ({
+    meta: [
       { title: "Derja Subtitle Extractor — Tunisian Arabic captions from video" },
       {
         name: "description",
