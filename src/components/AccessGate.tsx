@@ -45,26 +45,67 @@ export function AccessGate({ children }: { children: ReactNode }) {
   }
 
   if (!access?.active || access.plan === "free") {
+    const plans = [
+      { label: "1 Month", duration: "1 month" },
+      { label: "3 Months", duration: "3 months", badge: "Popular" },
+      { label: "6 Months", duration: "6 months" },
+      { label: "12 Months", duration: "12 months", badge: "Best value" },
+      { label: "Unlimited", duration: "lifetime" },
+    ];
+    const waNumber = "21692799284";
+    const buildWaUrl = (planLabel: string) => {
+      const msg = `Hi! I'd like to subscribe to the ${planLabel} plan for Derja Caption.\nAccount: ${access?.email ?? ""}`;
+      return `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
+    };
+
     return (
-      <main className="flex min-h-screen items-center justify-center px-4">
-        <div className="w-full max-w-md space-y-4 rounded-3xl border border-border bg-card/40 p-6 text-center backdrop-blur">
+      <main className="flex min-h-screen items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md space-y-5 rounded-3xl border border-border bg-card/40 p-6 text-center backdrop-blur">
           <Lock className="mx-auto h-6 w-6 text-primary" />
-          <h1 className="text-xl font-semibold">Subscription required</h1>
-          <p className="text-sm text-muted-foreground">
-            Your account ({access?.email}) is on the <b>Free</b> plan and is not active. Contact the
-            admin to activate your subscription.
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={async () => {
-                await supabase.auth.signOut();
-                navigate({ to: "/login" });
-              }}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-background/60 px-4 py-2.5 text-sm hover:bg-accent"
-            >
-              <LogOut className="h-4 w-4" /> Sign out
-            </button>
+          <div className="space-y-1">
+            <h1 className="text-xl font-semibold">Choose your plan</h1>
+            <p className="text-sm text-muted-foreground">
+              Account <b>{access?.email}</b> is on the Free plan. Pick a plan and contact us on WhatsApp to activate.
+            </p>
           </div>
+          <div className="space-y-2 text-left">
+            {plans.map((p) => (
+              <a
+                key={p.label}
+                href={buildWaUrl(p.label)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between rounded-xl border border-border bg-background/60 px-4 py-3 text-sm hover:bg-accent transition"
+              >
+                <div>
+                  <div className="font-medium">{p.label}</div>
+                  <div className="text-xs text-muted-foreground">Access for {p.duration}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {p.badge && (
+                    <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
+                      {p.badge}
+                    </span>
+                  )}
+                  <span className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+                    Subscribe
+                  </span>
+                </div>
+              </a>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Redirects to WhatsApp +216 92 799 284
+          </p>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate({ to: "/login" });
+            }}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background/60 px-4 py-2.5 text-sm hover:bg-accent"
+          >
+            <LogOut className="h-4 w-4" /> Sign out
+          </button>
         </div>
       </main>
     );
