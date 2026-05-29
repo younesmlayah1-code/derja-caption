@@ -416,13 +416,26 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
 
   const userMsg = JSON.stringify({ fullContext, segments: payload });
 
-  const content = await geminiChat({
-    system,
-    user: userMsg,
-    jsonMode: true,
-    model: "gemini-2.5-pro",
-  });
-  if (!content) return segments;
+  // Try flash first (high free-tier quota), fall back to pro if it fails,
+  // then 2.5-flash-lite as a last resort. This avoids the 429 quota errors
+  // that were silently dropping the polish step entirely.
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"];
+  let content = "";
+  let lastErr: unknown = null;
+  for (const model of models) {
+    try {
+      content = await geminiChat({ system, user: userMsg, jsonMode: true, model });
+      if (content) break;
+    } catch (e) {
+      lastErr = e;
+      console.error(`polishSegments: ${model} failed, trying fallback:`, e);
+    }
+  }
+  if (!content) {
+    if (lastErr) console.error("polishSegments: all models failed:", lastErr);
+    return segments;
+  }
+
 
   // Model may return either a bare array or an object wrapping it.
   let parsed: unknown;
