@@ -3,8 +3,9 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const ADMIN_EMAIL = "admin@derja.app";
+const ADMIN_EMAIL = "mlayounes0@gmail.com";
 const ADMIN_PASSWORD = "Youyou2010@1";
+const LEGACY_ADMIN_EMAILS = ["admin@derja.app"];
 
 export const getMyAccess = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -60,6 +61,17 @@ export const ensureAdminBootstrap = createServerFn({ method: "POST" }).handler(a
   await supabaseAdmin
     .from("user_roles")
     .upsert({ user_id: adminUser.id, role: "admin" }, { onConflict: "user_id,role" });
+  // Revoke admin role from legacy admin accounts (if any).
+  for (const legacyEmail of LEGACY_ADMIN_EMAILS) {
+    const legacy = list.users.find((u) => u.email?.toLowerCase() === legacyEmail);
+    if (legacy && legacy.id !== adminUser.id) {
+      await supabaseAdmin
+        .from("user_roles")
+        .delete()
+        .eq("user_id", legacy.id)
+        .eq("role", "admin");
+    }
+  }
   return { email: ADMIN_EMAIL };
 });
 
