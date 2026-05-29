@@ -426,8 +426,11 @@ function BetaApp() {
       const blob = await cutMp4Clip(file, clip.start, clip.end, (p) => setCutting(p));
       setCutBlob(blob);
       setCutting({ stage: "done", pct: 1 });
+      const ext = blob.type.includes("webm") ? "webm" : "mp4";
+      downloadBlob(blob, `${base}-clip.${ext}`);
     } catch (e) {
-      setError("Failed to cut MP4: " + ((e as Error).message || "unknown"));
+      const message = e instanceof Error && e.message ? e.message : String(e || "Video export failed.");
+      setError("Clip download failed: " + message);
       setCutting(null);
     }
   };
@@ -861,7 +864,7 @@ function BetaApp() {
                   ) : (
                     <>
                       <Scissors className="h-4 w-4" />
-                      Cut & Download MP4
+                      Download clip
                     </>
                   )}
                 </button>
@@ -875,7 +878,7 @@ function BetaApp() {
                   }}
                 >
                   <Download className="h-4 w-4" />
-                  Download MP4 ({(cutBlob.size / 1024 / 1024).toFixed(1)} MB)
+                  Download clip again ({(cutBlob.size / 1024 / 1024).toFixed(1)} MB)
                 </button>
               )}
 
@@ -888,7 +891,7 @@ function BetaApp() {
               </button>
             </div>
             <p className="mt-2 text-xs text-muted-foreground/70">
-              Clip export first tries MP4 cutting, then a browser recording fallback if needed.
+              The clip downloads automatically after export. Full video download uses the original file.
             </p>
           </Step>
         )}
