@@ -1,20 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { geminiChat } from "@/lib/gemini.server";
-import { Buffer } from "buffer";
 
 export const Route = createFileRoute("/api/transcribe")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         const apiKey = process.env.GROQ_API_KEY;
-        const geminiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey && !geminiKey) {
+        if (!apiKey) {
           return Response.json(
-            { error: "No transcription provider configured (GROQ_API_KEY or GEMINI_API_KEY)." },
+            { error: "Whisper transcription provider is not configured (GROQ_API_KEY)." },
             { status: 500 },
           );
         }
-
 
         let incoming: FormData;
         try {
