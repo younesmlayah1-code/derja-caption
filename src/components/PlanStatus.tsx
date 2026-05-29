@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Crown, Infinity as InfinityIcon, Clock3 } from "lucide-react";
+import { UserCog, RefreshCw, Infinity as InfinityIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { getMyAccess } from "@/lib/auth.functions";
 
@@ -10,7 +10,7 @@ export function daysRemaining(expiresAt: string | null): number | null {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
 
-/** Compact pill that shows the user's plan and time remaining. */
+/** Header actions: account management + renew, with a tiny status line. */
 export function PlanStatus({ className = "" }: { className?: string }) {
   const { session } = useAuth();
   const { data } = useQuery({
@@ -26,33 +26,41 @@ export function PlanStatus({ className = "" }: { className?: string }) {
   const unlimited = isPro && !data.expiresAt;
   const lowDays = days !== null && days <= 3;
 
-  const tone = isPro
-    ? lowDays
-      ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
-      : "border-primary/40 bg-primary/10 text-primary"
-    : "border-destructive/40 bg-destructive/10 text-destructive-foreground";
+  let statusText: React.ReactNode;
+  if (!isPro) statusText = <span className="text-destructive-foreground">Free · inactive</span>;
+  else if (unlimited)
+    statusText = (
+      <span className="inline-flex items-center gap-1 text-primary">
+        <InfinityIcon className="h-3 w-3" /> Unlimited
+      </span>
+    );
+  else
+    statusText = (
+      <span className={lowDays ? "text-amber-400" : "text-primary"}>
+        {days} day{days === 1 ? "" : "s"} left
+      </span>
+    );
 
   return (
-    <Link
-      to="/account"
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition hover:opacity-90 ${tone} ${className}`}
-    >
-      {isPro ? <Crown className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}
-      <span className="uppercase tracking-wide">
-        {isPro ? "Pro" : "Free"}
-      </span>
-      <span className="opacity-70">·</span>
-      {isPro ? (
-        unlimited ? (
-          <span className="inline-flex items-center gap-1">
-            <InfinityIcon className="h-3 w-3" /> Unlimited
-          </span>
-        ) : (
-          <span>{days} day{days === 1 ? "" : "s"} left</span>
-        )
-      ) : (
-        <span>Inactive</span>
-      )}
-    </Link>
+    <div className={`flex flex-col items-end gap-1 ${className}`}>
+      <div className="flex items-center gap-2">
+        <Link
+          to="/account"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/60 px-3 py-1.5 text-xs font-medium hover:bg-accent"
+        >
+          <UserCog className="h-3.5 w-3.5" />
+          Account
+        </Link>
+        <Link
+          to="/account"
+          hash="plans"
+          className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Renew
+        </Link>
+      </div>
+      <div className="text-[10px] uppercase tracking-wider">{statusText}</div>
+    </div>
   );
 }
