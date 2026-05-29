@@ -229,6 +229,7 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return segments;
 
+  const fullContext = segments.map((s) => s.text).join("\n");
   const payload = segments.map((s) => ({ id: s.id, text: s.text }));
 
   const system =
@@ -239,6 +240,8 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
     "**القاعدة الأهم — الكلمات الفرنسية والإنجليزية:** " +
     "التوانسة يخلطون برشا كلمات فرنسية في كلامهم. Whisper غالباً يكتبها غلط بحروف عربية مشوهة أو حتى بحروف لاتينية خاطئة. " +
     "مهمتك الأساسية: اكتشف أي كلمة أصلها فرنسي أو إنجليزي وأعد كتابتها بالحروف اللاتينية وبالإملاء الفرنسي/الإنجليزي الصحيح 100%. " +
+    "استعمل سياق النص الكامل لتعرف الكلمة: صحح داخل كل segment لكن لا تغيّر ترتيب segments ولا ids. " +
+    "إذا الكلمة تنطق فرنسي/إنجليزي، ممنوع تتركها بحروف عربية حتى لو Whisper كتبها هكا. " +
     "\n" +
     "أمثلة تصحيحات شائعة (الخطأ ← الصحيح):\n" +
     "- برودوي/برودوا/produi → produit\n" +
@@ -281,7 +284,7 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
     "أرجع JSON فقط بنفس البنية: " +
     '[{"id":number,"text":string}, ...]';
 
-  const userMsg = JSON.stringify(payload);
+  const userMsg = JSON.stringify({ fullContext, segments: payload });
 
   const content = await geminiChat({ system, user: userMsg, jsonMode: true, model: "gemini-2.5-pro" });
   if (!content) return segments;
