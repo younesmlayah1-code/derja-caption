@@ -107,6 +107,8 @@ export const adminUpdateUser = createServerFn({ method: "POST" })
         active: z.boolean().optional(),
         // Duration in months; null = unlimited (no expiry); omit = unchanged.
         durationMonths: z.number().int().min(0).max(120).nullable().optional(),
+        // Duration in days; takes precedence over durationMonths if both set.
+        durationDays: z.number().int().min(0).max(36500).nullable().optional(),
       })
       .parse(input),
   )
@@ -119,7 +121,13 @@ export const adminUpdateUser = createServerFn({ method: "POST" })
     } = {};
     if (data.plan !== undefined) patch.plan = data.plan;
     if (data.active !== undefined) patch.active = data.active;
-    if (data.durationMonths !== undefined) {
+    if (data.durationDays !== undefined) {
+      if (data.durationDays === null || data.durationDays === 0) {
+        patch.expires_at = null;
+      } else {
+        patch.expires_at = new Date(Date.now() + data.durationDays * 86400000).toISOString();
+      }
+    } else if (data.durationMonths !== undefined) {
       if (data.durationMonths === null || data.durationMonths === 0) {
         patch.expires_at = null; // unlimited
       } else {
