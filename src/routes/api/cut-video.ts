@@ -27,7 +27,8 @@ export const Route = createFileRoute("/api/cut-video")({
           }
 
           const clip = await cutWithServerFFmpeg(source, start, end, request.url);
-          const body = clip.buffer.slice(clip.byteOffset, clip.byteOffset + clip.byteLength);
+          const body = new ArrayBuffer(clip.byteLength);
+          new Uint8Array(body).set(clip);
           return new Response(body, {
             status: 200,
             headers: {
