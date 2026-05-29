@@ -321,6 +321,14 @@ function AdminPanel() {
                             No plans configured
                           </span>
                         )}
+                        <button
+                          onClick={() => grantCustomDays(u.id, u.email)}
+                          className="rounded-md border border-dashed border-border bg-background px-2 py-1 text-[11px] hover:border-primary hover:text-primary"
+                          title="Grant Pro for a custom number of days"
+                        >
+                          Custom…
+                        </button>
+
                       </div>
                     </td>
 
