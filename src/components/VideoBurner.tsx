@@ -1,28 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Film, Loader2, Download, Upload, X, Sparkles, Clock } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   BURN_STYLES,
   type BurnStyle,
   type BurnMode,
   type BurnScript,
-  buildAss,
-  burnSubtitles,
-  ARABIC_FONT_NAME,
-  LATIN_FONT_NAME,
 } from "@/lib/burn";
-import type { Segment } from "@/lib/subtitles";
+import {
+  createShotstackUpload,
+  getShotstackSource,
+  submitShotstackRender,
+  getShotstackRender,
+} from "@/lib/shotstack.functions";
+import { segmentToWordCues, type Segment } from "@/lib/subtitles";
 
 type Props = {
   segments: Segment[];
   mode: BurnMode;
   script: BurnScript;
-  /** Optional: the original file the user uploaded for transcription.
-   * If it's a video we offer to reuse it. */
+  /** Optional original file user uploaded for transcription (reused if it's a video). */
   sourceFile: File | null;
 };
 
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
-const FAST_RENDER_MAX_WIDTH = 720;
 
 function fmtTime(sec: number): string {
   const s = Math.max(0, Math.floor(sec));
@@ -36,12 +37,88 @@ function isVideoFile(f: File | null): boolean {
   return f.type.startsWith("video/") || /\.(mp4|mov|webm|avi|mkv)$/i.test(f.name);
 }
 
-function fitRenderSize(w: number, h: number): { w: number; h: number; fast: boolean } {
-  if (w <= FAST_RENDER_MAX_WIDTH) return { w, h, fast: false };
-  const nextW = FAST_RENDER_MAX_WIDTH;
-  const nextH = Math.max(2, Math.round((h * nextW) / w / 2) * 2);
-  return { w: nextW, h: nextH, fast: true };
+// ASS &HAABBGGRR → CSS color
+function assToCss(ass: string): string {
+  const m = ass.match(/&H([0-9A-F]{2})?([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})/i);
+  if (!m) return "#ffffff";
+  const a = parseInt(m[1] || "00", 16);
+  const b = parseInt(m[2], 16);
+  const g = parseInt(m[3], 16);
+  const r = parseInt(m[4], 16);
+  const alpha = (255 - a) / 255;
+  return alpha >= 1 ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${alpha.toFixed(2)})`;
 }
+
+function buildShotstackStyle(style: BurnStyle, script: BurnScript) {
+  const isBox = style.borderStyle === 3;
+  return {
+    id: style.id,
+    fontSize: Math.round(style.fontSize * 0.85),
+    color: assToCss(style.primary),
+    outline: assToCss(style.outline),
+    background: isBox ? assToCss(style.back) : "transparent",
+    bold: style.bold === 1,
+    rtl: script === "arabic",
+  };
+}
+
+function buildClips(segments: Segment[], mode: BurnMode): { start: number; length: number; text: string }[] {
+  const out: { start: number; length: number; text: string }[] = [];
+  if (mode === "word") {
+    for (const s of segments) {
+      const cues = segmentToWordCues(s);
+      for (const c of cues) {
+        const t = (c.text || "").trim();
+        if (!t) continue;
+        out.push({ start: c.start, length: Math.max(0.1, c.end - c.start), text: t });
+      }
+    }
+  } else {
+    for (const s of segments) {
+      const t = (s.text || "").trim();
+      if (!t) continue;
+      out.push({ start: s.start, length: Math.max(0.3, s.end - s.start), text: t });
+    }
+  }
+  return out;
+}
+
+function probeVideoMeta(file: File): Promise<{ w: number; h: number }> {
+  return new Promise((resolve) => {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.muted = true;
+    v.src = URL.createObjectURL(file);
+    v.onloadedmetadata = () => {
+      const w = v.videoWidth || 1080;
+      const h = v.videoHeight || 1920;
+      URL.revokeObjectURL(v.src);
+      resolve({ w, h });
+    };
+    v.onerror = () => {
+      URL.revokeObjectURL(v.src);
+      resolve({ w: 1080, h: 1920 });
+    };
+  });
+}
+
+function uploadWithProgress(url: string, file: File, onProgress: (r: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Upload failed (${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error("Upload network error"));
+    xhr.send(file);
+  });
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
   const [video, setVideo] = useState<File | null>(isVideoFile(sourceFile) ? sourceFile : null);
@@ -51,10 +128,14 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
   const [phase, setPhase] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
-  const [resultSize, setResultSize] = useState<number>(0);
   const [elapsed, setElapsed] = useState(0);
   const startRef = useRef<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const createUpload = useServerFn(createShotstackUpload);
+  const sourceStatus = useServerFn(getShotstackSource);
+  const submitRender = useServerFn(submitShotstackRender);
+  const renderStatus = useServerFn(getShotstackRender);
 
   useEffect(() => {
     if (!busy) return;
@@ -73,78 +154,89 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
       return;
     }
     if (f.size > MAX_VIDEO_BYTES) {
-      setError("Video exceeds 500MB browser limit.");
+      setError("Video exceeds 500MB limit.");
       return;
     }
     setVideo(f);
-    if (resultUrl) URL.revokeObjectURL(resultUrl);
     setResultUrl(null);
-    setResultSize(0);
   };
 
-  const fontName = script === "arabic" ? ARABIC_FONT_NAME : LATIN_FONT_NAME;
-
-  const probeMeta = useCallback(
-    (file: File): Promise<{ w: number; h: number; duration: number }> => {
-      return new Promise((resolve) => {
-        const v = document.createElement("video");
-        v.preload = "metadata";
-        v.muted = true;
-        v.src = URL.createObjectURL(file);
-        v.onloadedmetadata = () => {
-          const w = v.videoWidth || 1080;
-          const h = v.videoHeight || 1920;
-          const duration = Number.isFinite(v.duration) ? v.duration : 0;
-          URL.revokeObjectURL(v.src);
-          resolve({ w, h, duration });
-        };
-        v.onerror = () => {
-          URL.revokeObjectURL(v.src);
-          resolve({ w: 1080, h: 1920, duration: 0 });
-        };
-      });
-    },
-    [],
-  );
-
-  const run = async () => {
+  const run = useCallback(async () => {
     if (!video) return;
     setBusy(true);
     setError(null);
     setProgress(0);
-    setPhase("Preparing FFmpeg…");
+    setResultUrl(null);
+
     try {
-      const { w, h, duration } = await probeMeta(video);
-      const renderSize = fitRenderSize(w, h);
-      const ass = buildAss(segments, {
-        style,
-        mode,
-        script,
-        width: renderSize.w,
-        height: renderSize.h,
-        fontName,
+      setPhase("Preparing upload…");
+      const { w, h } = await probeVideoMeta(video);
+      const { uploadUrl, sourceId } = await createUpload();
+
+      setPhase("Uploading video to render service…");
+      await uploadWithProgress(uploadUrl, video, (r) => setProgress(0.05 + r * 0.35));
+
+      setPhase("Ingesting video…");
+      let sourceUrl: string | null = null;
+      for (let i = 0; i < 120; i++) {
+        await sleep(2000);
+        const s = await sourceStatus({ data: { sourceId } });
+        if (s.status === "ready" && s.sourceUrl) {
+          sourceUrl = s.sourceUrl;
+          break;
+        }
+        if (s.status === "failed") throw new Error(s.error || "Ingest failed");
+        setProgress(0.4 + Math.min(0.1, i * 0.005));
+      }
+      if (!sourceUrl) throw new Error("Ingest timed out.");
+
+      setPhase("Submitting render job…");
+      setProgress(0.55);
+      const clips = buildClips(segments, mode);
+      if (clips.length === 0) throw new Error("No caption segments to render.");
+      const { renderId } = await submitRender({
+        data: {
+          sourceUrl,
+          width: w,
+          height: h,
+          clips,
+          style: buildShotstackStyle(style, script),
+        },
       });
-      setPhase(renderSize.fast ? "Fast render at 720p…" : "Burning captions into video…");
-      const blob = await burnSubtitles({
-        videoFile: video,
-        ass,
-        targetWidth: renderSize.fast ? renderSize.w : undefined,
-        targetHeight: renderSize.fast ? renderSize.h : undefined,
-        durationSec: duration || undefined,
-        onPhase: setPhase,
-        onProgress: (r) => setProgress(r),
-      });
-      const url = URL.createObjectURL(blob);
-      setResultUrl(url);
-      setResultSize(blob.size);
+
+      setPhase("Rendering captions into video…");
+      let finalUrl: string | null = null;
+      for (let i = 0; i < 300; i++) {
+        await sleep(2500);
+        const r = await renderStatus({ data: { renderId } });
+        if (r.status === "done" && r.url) {
+          finalUrl = r.url;
+          break;
+        }
+        if (r.status === "failed") throw new Error(r.error || "Render failed");
+        // status: queued | fetching | rendering | saving | done
+        const stageMap: Record<string, number> = {
+          queued: 0.6,
+          fetching: 0.65,
+          rendering: 0.75,
+          saving: 0.95,
+        };
+        setProgress(Math.max(progress, stageMap[r.status] ?? 0.7));
+        setPhase(`Rendering · ${r.status}…`);
+      }
+      if (!finalUrl) throw new Error("Render timed out.");
+
+      setProgress(1);
       setPhase("Done");
+      setResultUrl(finalUrl);
     } catch (e) {
       console.error(e);
-      setError((e as Error).message || "Failed to burn captions.");
+      setError((e as Error).message || "Render failed.");
     } finally {
       setBusy(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [video, segments, mode, style, script]);
 
   const baseName = useMemo(() => (video ? video.name.replace(/\.[^.]+$/, "") : "video"), [video]);
 
@@ -157,7 +249,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
         <div>
           <h3 className="text-sm font-semibold">Burn captions into video</h3>
           <p className="text-xs text-muted-foreground">
-            100% in your browser · up to 500MB · MP4 output
+            Cloud render · up to 500MB · MP4 output
           </p>
         </div>
       </div>
@@ -208,7 +300,6 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
             <button
               onClick={() => {
                 setVideo(null);
-                if (resultUrl) URL.revokeObjectURL(resultUrl);
                 setResultUrl(null);
               }}
               className="rounded-lg p-1.5 text-muted-foreground hover:bg-background/50 hover:text-foreground"
@@ -275,7 +366,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
                 {fmtTime(elapsed)} elapsed
               </span>
               <span>
-                {progress > 0.11
+                {progress > 0.15
                   ? `~${fmtTime(Math.max(1, Math.round(elapsed / progress - elapsed)))} left`
                   : "estimating…"}
               </span>
@@ -306,12 +397,12 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
               style={{ maxHeight: 400 }}
             />
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-muted-foreground">
-                {(resultSize / 1024 / 1024).toFixed(1)} MB · MP4
-              </p>
+              <p className="text-xs text-muted-foreground">MP4 · cloud rendered</p>
               <a
                 href={resultUrl}
                 download={`${baseName}-captioned.mp4`}
+                target="_blank"
+                rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
               >
                 <Download className="h-4 w-4" /> Download video
@@ -319,7 +410,6 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
             </div>
             <button
               onClick={() => {
-                URL.revokeObjectURL(resultUrl);
                 setResultUrl(null);
                 setProgress(0);
               }}
@@ -331,8 +421,8 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
         )}
 
         <p className="text-[11px] leading-relaxed text-muted-foreground/70">
-          Tip: shorter clips (under ~3 min at 1080p) render fastest. Your video never leaves your
-          device.
+          Tip: shorter clips render faster. Files are uploaded securely to the render service and
+          deleted after processing.
         </p>
       </div>
     </div>
@@ -340,20 +430,9 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
 }
 
 function StylePreview({ style, script }: { style: BurnStyle; script: BurnScript }) {
-  // Convert ASS &HBBGGRR → CSS rgb
-  const cssColor = (ass: string): string => {
-    const m = ass.match(/&H([0-9A-F]{2})?([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})/i);
-    if (!m) return "#fff";
-    const a = parseInt(m[1] || "00", 16);
-    const b = parseInt(m[2], 16);
-    const g = parseInt(m[3], 16);
-    const r = parseInt(m[4], 16);
-    const alpha = (255 - a) / 255;
-    return `rgba(${r},${g},${b},${alpha})`;
-  };
-  const primary = cssColor(style.primary);
-  const outline = cssColor(style.outline);
-  const back = cssColor(style.back);
+  const primary = assToCss(style.primary);
+  const outline = assToCss(style.outline);
+  const back = assToCss(style.back);
   const sample = script === "arabic" ? "نص تجريبي" : "sample text";
 
   const isBox = style.borderStyle === 3;
