@@ -4,6 +4,7 @@ export const MANAGED_SECRETS = [
   "GROQ_API_KEY",
   "LOVABLE_API_KEY",
   "RAPIDAPI_KEY",
+  "GEMINI_API_KEY",
 ] as const;
 export type ManagedSecret = (typeof MANAGED_SECRETS)[number];
 

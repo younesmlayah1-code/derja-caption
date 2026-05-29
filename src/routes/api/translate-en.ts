@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSecret } from "@/lib/secrets.server";
 import { requireActiveUser } from "@/lib/access.server";
+import { geminiChat } from "@/lib/gemini.server";
 
 type Item = { id: number | string; text: string };
 
@@ -10,9 +11,9 @@ export const Route = createFileRoute("/api/translate-en")({
       POST: async ({ request }) => {
         const gate = await requireActiveUser(request);
         if (gate instanceof Response) return gate;
-        const key = await getSecret("LOVABLE_API_KEY");
+        const key = await getSecret("GEMINI_API_KEY");
         if (!key) {
-          return Response.json({ error: "LOVABLE_API_KEY is not configured." }, { status: 500 });
+          return Response.json({ error: "GEMINI_API_KEY is not configured." }, { status: 500 });
         }
 
         let body: { items?: Item[]; mode?: "line" | "word"; targetLang?: "english" | "french" };
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/api/translate-en")({
           : [];
         if (items.length === 0) return Response.json({ items: [] });
 
-        const apiKey: string = key;
+        void key;
         const mode = body.mode === "word" ? "word" : "line";
         const targetLang = body.targetLang === "french" ? "french" : "english";
         const CHUNK = mode === "word" ? 60 : 25;
@@ -45,7 +46,7 @@ export const Route = createFileRoute("/api/translate-en")({
           while (true) {
             const idx = next++;
             if (idx >= chunks.length) return;
-            results[idx] = await translateChunk(chunks[idx], mode, targetLang, apiKey).catch((e) => {
+            results[idx] = await translateChunk(chunks[idx], mode, targetLang).catch((e) => {
               console.error("translate-en chunk failed:", e);
               return chunks[idx];
             });
@@ -66,7 +67,6 @@ async function translateChunk(
   items: Item[],
   mode: "line" | "word",
   targetLang: "english" | "french",
-  key: string,
 ): Promise<Item[]> {
   const langName = targetLang === "french" ? "French" : "English";
   const system =
@@ -87,29 +87,17 @@ async function translateChunk(
         "Do not add or remove information. Do not add disclaimers. " +
         'Return JSON only with the same structure: {"items":[{"id":...,"text":"..."}]}';
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": key,
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
+  let content = "";
+  try {
+    content = await geminiChat({
+      system,
+      user: JSON.stringify({ items }),
+      jsonMode: true,
       temperature: 0,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: JSON.stringify({ items }) },
-      ],
-      response_format: { type: "json_object" },
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`AI translate-en failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
+    });
+  } catch (e) {
+    throw new Error(`AI translate-en failed: ${(e as Error).message}`);
   }
-
-  const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = j.choices?.[0]?.message?.content?.trim() ?? "";
   if (!content) return items;
 
   let parsed: unknown;

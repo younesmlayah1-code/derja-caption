@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSecret } from "@/lib/secrets.server";
 import { requireActiveUser } from "@/lib/access.server";
+import { geminiChat } from "@/lib/gemini.server";
 
 type SegIn = { id: number; start: number; end: number; text: string };
 type Range = { start: number; end: number };
@@ -11,10 +12,11 @@ export const Route = createFileRoute("/api/suggest-clip")({
       POST: async ({ request }) => {
         const gate = await requireActiveUser(request);
         if (gate instanceof Response) return gate;
-        const key = await getSecret("LOVABLE_API_KEY");
+        const key = await getSecret("GEMINI_API_KEY");
         if (!key) {
-          return Response.json({ error: "LOVABLE_API_KEY is not configured." }, { status: 500 });
+          return Response.json({ error: "GEMINI_API_KEY is not configured." }, { status: 500 });
         }
+        void key;
 
         let body: {
           segments?: SegIn[];
@@ -66,33 +68,21 @@ export const Route = createFileRoute("/api/suggest-clip")({
 
         const user = JSON.stringify({ totalDurationSec: totalDur, segments: compact });
 
-        const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Lovable-API-Key": key,
-          },
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+        let content = "";
+        try {
+          content = await geminiChat({
+            system,
+            user,
+            jsonMode: true,
             temperature: excludeRanges.length > 0 ? 0.7 : 0.3,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: user },
-            ],
-            response_format: { type: "json_object" },
-          }),
-        });
-
-        if (!res.ok) {
-          const text = await res.text();
+          });
+        } catch (e) {
           return Response.json(
-            { error: `AI suggest-clip failed (${res.status}): ${text.slice(0, 300)}` },
+            { error: `AI suggest-clip failed: ${(e as Error).message}` },
             { status: 502 },
           );
         }
 
-        const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-        const content = j.choices?.[0]?.message?.content?.trim() ?? "";
         let parsed: { start?: number; end?: number; title?: string; reason?: string } = {};
         try {
           parsed = JSON.parse(content);

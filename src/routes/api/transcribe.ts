@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { geminiChat } from "@/lib/gemini.server";
 
 export const Route = createFileRoute("/api/transcribe")({
   server: {
@@ -143,7 +144,7 @@ type PolishSeg = { id: number; start: number; end: number; text: string };
 // cleaned text. Throws on hard failure; caller falls back to raw segments.
 async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   if (segments.length === 0) return segments;
-  const key = process.env.LOVABLE_API_KEY;
+  const key = process.env.GEMINI_API_KEY;
   if (!key) return segments;
 
   const payload = segments.map((s) => ({ id: s.id, text: s.text }));
@@ -163,30 +164,7 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
 
   const userMsg = JSON.stringify(payload);
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": key,
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userMsg },
-      ],
-      response_format: { type: "json_object" },
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Lovable AI polish failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
-  }
-
-  const j = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = j.choices?.[0]?.message?.content?.trim() ?? "";
+  const content = await geminiChat({ system, user: userMsg, jsonMode: true });
   if (!content) return segments;
 
   // Model may return either a bare array or an object wrapping it.
