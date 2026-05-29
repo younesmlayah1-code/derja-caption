@@ -446,7 +446,14 @@ export async function cutMp4Clip(
     return new Blob([buf], { type: "video/mp4" });
   } catch (e) {
     resetFFmpeg();
-    throw new Error(errorDetails(e));
+    try {
+      onProgress?.({ stage: "recording", pct: 0, note: "Encoder fallback" });
+      const fallback = await recordClipFallback(file, startSec, endSec, onProgress);
+      onProgress?.({ stage: "done", pct: 1 });
+      return fallback;
+    } catch (fallbackError) {
+      throw new Error(`${errorDetails(e)}. Fallback failed: ${errorDetails(fallbackError)}`);
+    }
   } finally {
     ff.off("progress", progressHandler);
     if (mounted) {
