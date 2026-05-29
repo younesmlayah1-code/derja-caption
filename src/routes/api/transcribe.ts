@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { getSecret } from "@/lib/secrets.server";
 
 export const Route = createFileRoute("/api/transcribe")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apiKey = process.env.GROQ_API_KEY;
+        const apiKey = await getSecret("GROQ_API_KEY");
         if (!apiKey) {
           return Response.json({ error: "GROQ_API_KEY is not configured on the server." }, { status: 500 });
         }
@@ -147,7 +148,7 @@ type PolishSeg = { id: number; start: number; end: number; text: string };
 // cleaned text. Throws on hard failure; caller falls back to raw segments.
 async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   if (segments.length === 0) return segments;
-  const key = process.env.LOVABLE_API_KEY;
+  const key = await getSecret("LOVABLE_API_KEY");
   if (!key) return segments;
 
   const payload = segments.map((s) => ({ id: s.id, text: s.text }));

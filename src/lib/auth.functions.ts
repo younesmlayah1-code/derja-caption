@@ -105,3 +105,63 @@ export const adminDeleteUser = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+const MANAGED = ["GROQ_API_KEY", "OPENAI_API_KEY", "LOVABLE_API_KEY", "RAPIDAPI_KEY", "SHOTSTACK_API_KEY"] as const;
+type ManagedKey = (typeof MANAGED)[number];
+
+export const adminListSecrets = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(supabaseAdmin, context.userId);
+    const { data } = await supabaseAdmin
+      .from("app_settings")
+      .select("key, value, updated_at")
+      .in("key", MANAGED as unknown as string[]);
+    const rows = (data ?? []) as { key: string; value: string; updated_at: string }[];
+    const map = new Map(rows.map((r) => [r.key, r]));
+    return MANAGED.map((k) => {
+      const r = map.get(k);
+      const overrideValue = r?.value ?? "";
+      const envSet = !!(process.env[k] && process.env[k]!.trim());
+      return {
+        key: k,
+        hasOverride: !!overrideValue,
+        masked: overrideValue ? mask(overrideValue) : envSet ? "(using env value)" : "(not set)",
+        updatedAt: r?.updated_at ?? null,
+        envSet,
+      };
+    });
+  });
+
+export const adminUpdateSecret = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        key: z.enum(MANAGED),
+        value: z.string().max(24576),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(supabaseAdmin, context.userId);
+    const trimmed = data.value.trim();
+    if (!trimmed) {
+      // empty = clear override -> fallback to env
+      const { error } = await supabaseAdmin.from("app_settings").delete().eq("key", data.key);
+      if (error) throw new Error(error.message);
+      return { ok: true, cleared: true };
+    }
+    const { error } = await supabaseAdmin
+      .from("app_settings")
+      .upsert({ key: data.key, value: trimmed }, { onConflict: "key" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+function mask(v: string): string {
+  if (v.length <= 8) return "•".repeat(v.length);
+  return `${v.slice(0, 4)}${"•".repeat(Math.max(4, v.length - 8))}${v.slice(-4)}`;
+}
+
+export type ManagedSecretKey = ManagedKey;
