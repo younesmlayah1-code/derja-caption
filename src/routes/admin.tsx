@@ -687,3 +687,79 @@ function SecretRow({
     </div>
   );
 }
+
+function BetaAccessButton() {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [pwd, setPwd] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (pwd === "youyou2010") {
+      sessionStorage.setItem("beta_unlocked", "1");
+      navigate({ to: "/beta" });
+    } else {
+      setErr("Wrong password");
+    }
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => {
+          setOpen(true);
+          setErr(null);
+          setPwd("");
+        }}
+        className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-sm hover:bg-accent"
+      >
+        <FlaskConical className="h-4 w-4" /> Beta
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+          onClick={() => setOpen(false)}
+        >
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={submit}
+            className="w-full max-w-sm space-y-3 rounded-2xl border border-border bg-card p-5 shadow-xl"
+          >
+            <div className="flex items-center gap-2">
+              <FlaskConical className="h-5 w-5 text-primary" />
+              <h2 className="text-base font-semibold">Beta workspace</h2>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Enter the access password to open the beta workspace.
+            </p>
+            <input
+              type="password"
+              autoFocus
+              value={pwd}
+              onChange={(e) => setPwd(e.target.value)}
+              placeholder="Password"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+            {err && <p className="text-xs text-destructive-foreground">{err}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-xl border border-border px-3 py-1.5 text-sm hover:bg-accent"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="rounded-xl bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Open beta
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
+  );
+}
