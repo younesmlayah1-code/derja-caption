@@ -99,7 +99,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
     setProgress(0);
     setPhase("Preparing FFmpeg…");
     try {
-      const { w, h } = await probeDimensions(video);
+      const { w, h, duration } = await probeMeta(video);
       const ass = buildAss(segments, {
         style,
         mode,
@@ -112,6 +112,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
       const blob = await burnSubtitles({
         videoFile: video,
         ass,
+        durationSec: duration || undefined,
         onProgress: (r) => setProgress(r),
       });
       const url = URL.createObjectURL(blob);
