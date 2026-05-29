@@ -102,7 +102,7 @@ function BetaApp() {
       const j = (await res.json()) as { mp4Url?: string; filename?: string; error?: string };
       if (!res.ok || !j.mp4Url) throw new Error(j.error || `HTTP ${res.status}`);
       const proxyUrl = `/api/youtube-fetch?stream=${encodeURIComponent(j.mp4Url)}&name=${encodeURIComponent(j.filename || "youtube.mp4")}`;
-      const blobRes = await fetch(proxyUrl);
+      const blobRes = await authedFetch(proxyUrl);
       if (!blobRes.ok) throw new Error(`Download failed (${blobRes.status}).`);
       const blob = await blobRes.blob();
       const f = new File([blob], j.filename || "youtube.mp4", { type: blob.type || "video/mp4" });
