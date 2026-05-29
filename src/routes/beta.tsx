@@ -16,12 +16,7 @@ import {
   Lock,
   CheckCircle2,
 } from "lucide-react";
-import {
-  toSrt,
-  fmtTime,
-  downloadFile,
-  type Segment,
-} from "@/lib/subtitles";
+import { toSrt, fmtTime, downloadFile, type Segment } from "@/lib/subtitles";
 import { transcribeFile } from "@/lib/transcribe";
 import { cutMp4Clip } from "@/lib/clip-mp4";
 
@@ -130,6 +125,7 @@ function BetaApp() {
     setSegments([]);
     setTranscript("");
     setClip(null);
+    setLang(null);
     setTriedRanges([]);
     setEnglishMap(new Map());
     setFrenchMap(new Map());
@@ -164,7 +160,10 @@ function BetaApp() {
     }
   };
 
-  // ------- Step 2: transcribe (full video) -------
+  // ------- Step 2: language selection -------
+  const [lang, setLang] = useState<Lang | null>(null);
+
+  // ------- Step 3: transcribe (full video) -------
   type Stage = "idle" | "extracting" | "uploading" | "transcribing" | "done" | "error";
   const [stage, setStage] = useState<Stage>("idle");
   const [progressLabel, setProgressLabel] = useState("");
@@ -176,12 +175,16 @@ function BetaApp() {
     setError(null);
     setStage("extracting");
     try {
-      const result = await transcribeFile(file, undefined, ({ stage: s, chunkIndex, chunkCount }) => {
-        setStage(s);
-        setProgressLabel(
-          chunkCount && chunkCount > 1 && chunkIndex ? ` (part ${chunkIndex}/${chunkCount})` : "",
-        );
-      });
+      const result = await transcribeFile(
+        file,
+        undefined,
+        ({ stage: s, chunkIndex, chunkCount }) => {
+          setStage(s);
+          setProgressLabel(
+            chunkCount && chunkCount > 1 && chunkIndex ? ` (part ${chunkIndex}/${chunkCount})` : "",
+          );
+        },
+      );
       setTranscript(result.text);
       setSegments(result.segments);
       setStage("done");
@@ -191,7 +194,7 @@ function BetaApp() {
     }
   }, [file]);
 
-  // ------- Step 3: AI clip suggestion + regenerate + manual -------
+  // ------- Step 4: AI clip suggestion + regenerate + manual -------
   const [clip, setClip] = useState<Clip | null>(null);
   const [clipLoading, setClipLoading] = useState(false);
   const [triedRanges, setTriedRanges] = useState<Array<{ start: number; end: number }>>([]);
@@ -208,7 +211,8 @@ function BetaApp() {
     setClipLoading(true);
     setCutBlob(null);
     try {
-      const exclude = regenerate && clip ? [...triedRanges, { start: clip.start, end: clip.end }] : [];
+      const exclude =
+        regenerate && clip ? [...triedRanges, { start: clip.start, end: clip.end }] : [];
       const minSec = Math.max(15, targetDuration - 10);
       const maxSec = targetDuration + 10;
       const res = await fetch("/api/suggest-clip", {
@@ -222,14 +226,16 @@ function BetaApp() {
         }),
       });
       const j = (await res.json()) as Partial<Clip> & { error?: string };
-      if (!res.ok || j.start == null || j.end == null) throw new Error(j.error || `HTTP ${res.status}`);
+      if (!res.ok || j.start == null || j.end == null)
+        throw new Error(j.error || `HTTP ${res.status}`);
       const newClip: Clip = {
         start: j.start,
         end: j.end,
         title: j.title || "Best clip",
         reason: j.reason || "",
       };
-      if (regenerate && clip) setTriedRanges((prev) => [...prev, { start: clip.start, end: clip.end }]);
+      if (regenerate && clip)
+        setTriedRanges((prev) => [...prev, { start: clip.start, end: clip.end }]);
       setClip(newClip);
       setManualStart(newClip.start.toFixed(1));
       setManualEnd(newClip.end.toFixed(1));
@@ -247,7 +253,7 @@ function BetaApp() {
     setClip({ start: s, end: e, title: "Manual clip", reason: "" });
   };
 
-  // ------- Step 3b: clip preview (clamp to range) -------
+  // ------- Step 4b: clip preview (clamp to range) -------
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -289,9 +295,6 @@ function BetaApp() {
     }
   };
 
-  // ------- Step 4: language selection -------
-  const [lang, setLang] = useState<Lang>("derja-ar");
-
   // Clip-scoped segments (renumbered, relative time)
   const clipSegments = useMemo(() => {
     if (!clip) return [] as Segment[];
@@ -317,7 +320,7 @@ function BetaApp() {
   const [translating, setTranslating] = useState(false);
 
   useEffect(() => {
-    if (!clip || clipSegments.length === 0) return;
+    if (!lang || !clip || clipSegments.length === 0) return;
     if (lang === "derja-ar") return;
 
     const texts = clipSegments.map((s) => s.text).filter(Boolean);
@@ -375,7 +378,7 @@ function BetaApp() {
   }, [lang, clipSegments, clip, englishMap, frenchMap, frenchDerjaMap]);
 
   const baseTextFor = (s: Segment): string => {
-    if (lang === "derja-ar") return s.text;
+    if (!lang || lang === "derja-ar") return s.text;
     if (lang === "english") return englishMap.get(s.text) ?? s.text;
     if (lang === "french") return frenchMap.get(s.text) ?? s.text;
     return frenchDerjaMap.get(s.text) ?? s.text;
@@ -384,12 +387,13 @@ function BetaApp() {
   // ------- Step 5: editable transcript -------
   // Override key = `${lang}:${id}` so edits per language stay separate.
   const [overrides, setOverrides] = useState<Map<string, string>>(new Map());
-  const displayFor = (s: Segment): string => overrides.get(`${lang}:${s.id}`) ?? baseTextFor(s);
+  const displayFor = (s: Segment): string =>
+    overrides.get(`${lang ?? "derja-ar"}:${s.id}`) ?? baseTextFor(s);
 
   const updateSegment = (id: number, value: string) => {
     setOverrides((prev) => {
       const next = new Map(prev);
-      next.set(`${lang}:${id}`, value);
+      next.set(`${lang ?? "derja-ar"}:${id}`, value);
       return next;
     });
   };
@@ -443,6 +447,7 @@ function BetaApp() {
     setSegments([]);
     setTranscript("");
     setClip(null);
+    setLang(null);
     setTriedRanges([]);
     setEnglishMap(new Map());
     setFrenchMap(new Map());
@@ -468,8 +473,8 @@ function BetaApp() {
             <span className="gradient-text">Pick. Caption. Ship.</span>
           </h1>
           <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
-            Drop a video or paste a YouTube link. AI picks the best 1.5–3 min clip,
-            transcribes it, and exports MP4 + SRT.
+            Drop a video or paste a YouTube link. AI picks the best 1.5–3 min clip, transcribes it,
+            and exports MP4 + SRT.
           </p>
         </header>
 
@@ -541,7 +546,11 @@ function BetaApp() {
                     disabled={ytLoading || !ytUrl.trim()}
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >
-                    {ytLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    {ytLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
                     {ytLoading ? "Fetching…" : "Fetch MP4"}
                   </button>
                 </div>
@@ -554,7 +563,9 @@ function BetaApp() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{file.name}</p>
-                <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
+                <p className="text-xs text-muted-foreground">
+                  {(file.size / 1024 / 1024).toFixed(1)} MB
+                </p>
               </div>
               {!busy && (
                 <button
@@ -569,9 +580,31 @@ function BetaApp() {
           )}
         </Step>
 
-        {/* ─── STEP 2: transcribe ─── */}
+        {/* ─── STEP 2: language ─── */}
         {file && (
-          <Step number={2} title="Transcribe" done={segments.length > 0}>
+          <Step number={2} title="Caption language" done={!!lang}>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {(Object.keys(LANG_LABELS) as Lang[]).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
+                    lang === l
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card/40 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Languages className="h-3.5 w-3.5" />
+                  {LANG_LABELS[l]}
+                </button>
+              ))}
+            </div>
+          </Step>
+        )}
+
+        {/* ─── STEP 3: transcribe ─── */}
+        {file && lang && (
+          <Step number={3} title="Transcribe" done={segments.length > 0}>
             {segments.length === 0 ? (
               <div className="space-y-3">
                 {busy ? (
@@ -602,9 +635,9 @@ function BetaApp() {
           </Step>
         )}
 
-        {/* ─── STEP 3: AI clip ─── */}
+        {/* ─── STEP 4: AI clip ─── */}
         {segments.length > 0 && (
-          <Step number={3} title="Pick the clip" done={!!clip}>
+          <Step number={4} title="Pick the clip" done={!!clip}>
             <div className="space-y-3">
               <div>
                 <p className="mb-2 text-xs font-medium text-muted-foreground">Target duration</p>
@@ -630,11 +663,20 @@ function BetaApp() {
 
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => { setManualMode(false); void suggestClip(!!clip); }}
+                  onClick={() => {
+                    setManualMode(false);
+                    void suggestClip(!!clip);
+                  }}
                   disabled={clipLoading}
                   className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
-                  {clipLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : clip ? <RefreshCw className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                  {clipLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : clip ? (
+                    <RefreshCw className="h-4 w-4" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
                   {clip ? "Try another (AI)" : "Find best clip with AI"}
                 </button>
                 <button
@@ -675,7 +717,12 @@ function BetaApp() {
                     </label>
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Total: {fmtTime(totalDuration)} · Selected: {Math.max(0, (parseFloat(manualEnd) || 0) - (parseFloat(manualStart) || 0)).toFixed(1)}s
+                    Total: {fmtTime(totalDuration)} · Selected:{" "}
+                    {Math.max(
+                      0,
+                      (parseFloat(manualEnd) || 0) - (parseFloat(manualStart) || 0),
+                    ).toFixed(1)}
+                    s
                   </p>
                   <button
                     onClick={applyManualClip}
@@ -701,11 +748,16 @@ function BetaApp() {
                       onClick={togglePlay}
                       className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 font-medium text-primary-foreground"
                     >
-                      {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                      {playing ? (
+                        <Pause className="h-3.5 w-3.5" />
+                      ) : (
+                        <Play className="h-3.5 w-3.5" />
+                      )}
                       {playing ? "Pause" : "Play clip"}
                     </button>
                     <span className="rounded-md bg-primary/15 px-2 py-1 font-mono text-primary">
-                      {fmtTime(clip.start)} → {fmtTime(clip.end)} · {Math.round(clip.end - clip.start)}s
+                      {fmtTime(clip.start)} → {fmtTime(clip.end)} ·{" "}
+                      {Math.round(clip.end - clip.start)}s
                     </span>
                   </div>
                   <div>
@@ -718,36 +770,13 @@ function BetaApp() {
           </Step>
         )}
 
-
-        {/* ─── STEP 4: language ─── */}
-        {clip && (
-          <Step number={4} title="Caption language" done={true}>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {(Object.keys(LANG_LABELS) as Lang[]).map((l) => (
-                <button
-                  key={l}
-                  onClick={() => setLang(l)}
-                  className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
-                    lang === l
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card/40 text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Languages className="h-3.5 w-3.5" />
-                  {LANG_LABELS[l]}
-                </button>
-              ))}
-            </div>
-          </Step>
-        )}
-
         {/* ─── STEP 5: edit transcript ─── */}
         {clip && clipSegments.length > 0 && (
           <Step number={5} title="Review & edit captions">
             {translating ? (
               <div className="flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-6 text-sm text-primary">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Translating to {LANG_LABELS[lang]}…
+                Translating to {lang ? LANG_LABELS[lang] : "selected language"}…
               </div>
             ) : (
               <div className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
