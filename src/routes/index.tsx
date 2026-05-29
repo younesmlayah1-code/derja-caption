@@ -27,6 +27,7 @@ import {
   type Segment,
 } from "@/lib/subtitles";
 import { transcribeFile, type RateInfo } from "@/lib/transcribe";
+import { AccessGate } from "@/components/AccessGate";
 
 type Script = "arabic" | "french" | "english";
 
@@ -60,16 +61,23 @@ function splitLongSegments(segs: Segment[]): Segment[] {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Derja Subtitle Extractor — Tunisian Arabic captions from video" },
+      { title: "Derja Caption — AI Tunisian Arabic subtitles" },
       {
         name: "description",
-        content:
-          "Upload a video and extract Tunisian Arabic (Derja) subtitles with English translation, line- or word-level.",
+        content: "Extract Tunisian Arabic (Derja) subtitles from your videos with AI.",
       },
     ],
   }),
-  component: Home,
+  component: HomeGated,
 });
+
+function HomeGated() {
+  return (
+    <AccessGate>
+      <Home />
+    </AccessGate>
+  );
+}
 
 const ACCEPTED = [
   "video/mp4",
