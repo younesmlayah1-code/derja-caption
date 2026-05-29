@@ -107,10 +107,10 @@ export const Route = createFileRoute("/api/transcribe")({
         // Polish spelling, spacing, and punctuation with Lovable AI while
         // preserving the original Derja words and meaning. Failures here are
         // non-fatal — we fall back to the raw Whisper output.
-        const polishedSegments = await polishSegments(segments).catch((e: unknown) => {
+        const polishedSegments = (await polishSegments(segments).catch((e: unknown) => {
           console.error("polishSegments failed:", e);
           return segments;
-        }).then((items) => items.map(syncWordsToSegmentText));
+        })).map(syncWordsToSegmentText);
 
         const fullText = polishedSegments.map((s: { text: string }) => s.text).join(" ").trim()
           || normalizeLoanwords(dedupeRepeats((data.text || "").trim()));
