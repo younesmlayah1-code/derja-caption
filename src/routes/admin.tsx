@@ -313,28 +313,18 @@ function AdminPanel() {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => {
+                      <select
+                        value={u.plan}
+                        onChange={(e) => {
+                          const newPlan = e.target.value as "free" | "pro";
+                          if (newPlan === "free") {
                             update.mutate({
                               userId: u.id,
                               plan: "free",
                               active: false,
                               durationDays: null,
                             });
-                          }}
-                          className={`rounded-md border px-2 py-1 text-xs font-medium transition ${
-                            u.plan === "free"
-                              ? "border-primary/50 bg-primary/10 text-primary"
-                              : "border-border bg-background text-muted-foreground hover:bg-accent"
-                          }`}
-                        >
-                          free
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
+                          } else {
                             const raw = window.prompt(
                               `Grant Pro to ${u.email} for how many days? (0 = unlimited)`,
                             );
@@ -350,17 +340,15 @@ function AdminPanel() {
                               active: true,
                               durationDays: days === 0 ? null : Math.floor(days),
                             });
-                          }}
-                          className={`rounded-md border px-2 py-1 text-xs font-medium transition ${
-                            u.plan === "pro"
-                              ? "border-primary/50 bg-primary/10 text-primary"
-                              : "border-border bg-background text-muted-foreground hover:bg-accent"
-                          }`}
-                        >
-                          pro
-                        </button>
-                      </div>
+                          }
+                        }}
+                        className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                      >
+                        <option value="free">free</option>
+                        <option value="pro">pro</option>
+                      </select>
                     </td>
+
                     <td className="px-3 py-3">
                       <button
                         type="button"
