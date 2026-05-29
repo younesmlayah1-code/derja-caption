@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSecret } from "@/lib/secrets.server";
 import { requireActiveUser } from "@/lib/access.server";
+import { geminiChat } from "@/lib/gemini.server";
 
 type SegIn = { id: number; start: number; end: number; text: string };
 type Range = { start: number; end: number };
