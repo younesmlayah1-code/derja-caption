@@ -98,7 +98,11 @@ const LANG_LABELS: Record<Lang, string> = {
 };
 
 type Clip = { start: number; end: number; title: string; reason: string };
-type CutProgress = { stage: "loading" | "cutting" | "done"; pct?: number } | null;
+type CutProgress = {
+  stage: "loading" | "cutting" | "recording" | "done";
+  pct?: number;
+  note?: string;
+} | null;
 
 function BetaApp() {
   // ------- Step 1: source -------
@@ -430,10 +434,20 @@ function BetaApp() {
 
   const downloadMp4 = () => {
     if (!cutBlob) return;
+    const ext = cutBlob.type.includes("webm") ? "webm" : "mp4";
+    downloadBlob(cutBlob, `${base}-clip.${ext}`);
+  };
+
+  const downloadFullVideo = () => {
+    if (!file) return;
+    downloadBlob(file, file.name || `${base}.mp4`);
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(cutBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${base}-clip.mp4`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
