@@ -25,16 +25,31 @@ export const Route = createFileRoute("/api/translate-en")({
 
         const mode = body.mode === "word" ? "word" : "line";
         const targetLang = body.targetLang === "french" ? "french" : "english";
-        const CHUNK = 40;
-        const out: Item[] = [];
+        const CHUNK = mode === "word" ? 60 : 25;
+        const CONCURRENCY = 4;
+
+        // Split into chunks and run in parallel for much lower latency on long videos.
+        const chunks: Item[][] = [];
         for (let i = 0; i < items.length; i += CHUNK) {
-          const slice = items.slice(i, i + CHUNK);
-          const translated = await translateChunk(slice, mode, targetLang, key).catch((e) => {
-            console.error("translate-en chunk failed:", e);
-            return slice;
-          });
-          out.push(...translated);
+          chunks.push(items.slice(i, i + CHUNK));
         }
+
+        const results: Item[][] = new Array(chunks.length);
+        let next = 0;
+        async function worker() {
+          while (true) {
+            const idx = next++;
+            if (idx >= chunks.length) return;
+            results[idx] = await translateChunk(chunks[idx], mode, targetLang, key).catch((e) => {
+              console.error("translate-en chunk failed:", e);
+              return chunks[idx];
+            });
+          }
+        }
+        await Promise.all(
+          Array.from({ length: Math.min(CONCURRENCY, chunks.length) }, () => worker()),
+        );
+        const out: Item[] = results.flat();
 
         return Response.json({ items: out });
       },
@@ -51,15 +66,21 @@ async function translateChunk(
   const langName = targetLang === "french" ? "French" : "English";
   const system =
     mode === "word"
-      ? `You translate single Tunisian Arabic (Derja) words/tokens into ${langName}. ` +
-        `For each item return the most natural single-word or short ${langName} equivalent. ` +
-        "Keep proper nouns and code-switched French/English words as-is. " +
-        "Do not add explanations. Return JSON only: " +
-        '{"items":[{"id":...,"text":"..."}]}'
-      : `You are a professional translator. Translate Tunisian Arabic (Derja) into clear, natural ${langName}. ` +
-        "Preserve meaning, tone and punctuation. Keep proper nouns. Do not add or remove information. " +
-        "Return JSON only with the same structure: " +
-        '{"items":[{"id":...,"text":"..."}]}';
+      ? `You translate single Tunisian Arabic (Derja) tokens into ${langName}. ` +
+        `Return the most natural single-word or very short ${langName} equivalent for each item. ` +
+        "Keep proper nouns, brand names, and code-switched French/English words exactly as-is. " +
+        "If a token is filler, hesitation, or untranslatable in isolation, return it unchanged. " +
+        "Do not add explanations, alternatives, or parentheses. " +
+        'Return JSON only: {"items":[{"id":...,"text":"..."}]}'
+      : `You are an expert translator of Tunisian Arabic (Derja) into fluent, natural ${langName}. ` +
+        "Translate meaning, not word-by-word. Make it sound like a native speaker — idiomatic, clear, conversational. " +
+        "Preserve tone (casual stays casual, formal stays formal), punctuation, and sentence boundaries. " +
+        "Keep proper nouns, brand names, and code-switched French/English words intact. " +
+        "Common Derja: برشا=a lot, ياسر=very/a lot, شنوة=what, علاش=why, كيفاش=how, وقتاش=when, " +
+        "باهي=good/okay, موش=not, ماكش=you aren't, توا=now, يعيشك=thanks/please, زادا=also, " +
+        "خاطر=because, نجم=I can, فما=there is, أما=but, إيا=come on, مالا=so/then. " +
+        "Do not add or remove information. Do not add disclaimers. " +
+        'Return JSON only with the same structure: {"items":[{"id":...,"text":"..."}]}';
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
