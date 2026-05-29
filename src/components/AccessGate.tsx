@@ -10,6 +10,10 @@ export function AccessGate({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
 
+  const betaUnlocked =
+    typeof window !== "undefined" && sessionStorage.getItem("beta_unlocked") === "1";
+  if (betaUnlocked) return <>{children}</>;
+
   const { data: access, isLoading: accessLoading } = useQuery({
     queryKey: ["my-access", session?.user.id],
     queryFn: () => getMyAccess(),
