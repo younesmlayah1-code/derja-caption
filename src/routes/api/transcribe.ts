@@ -370,6 +370,117 @@ function syncWordsToSegmentText(seg: PolishSeg): PolishSeg {
   };
 }
 
+async function transcribeHighAccuracyText(file: File, prompt: string): Promise<string> {
+  const openAiKey = process.env.OPENAI_API_KEY;
+  if (openAiKey) {
+    const upstream = new FormData();
+    upstream.append("file", file, file.name || "audio.wav");
+    upstream.append("model", "gpt-4o-transcribe");
+    upstream.append("response_format", "json");
+    upstream.append(
+      "prompt",
+      `${prompt}\n\nReturn a clean verbatim transcript. Keep Tunisian Derja in Arabic script. Write French/English words in correct Latin spelling with accents, for example lycée, école, problème, rendez-vous, téléphone.`,
+    );
+
+    const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${openAiKey}` },
+      body: upstream,
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { text?: string };
+      const text = normalizeTranscript(json.text ?? "");
+      if (text) return text;
+    } else {
+      console.error(`OpenAI transcription failed (${res.status}):`, (await res.text()).slice(0, 500));
+    }
+  }
+
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) return "";
+  const audioBase64 = Buffer.from(await file.arrayBuffer()).toString("base64");
+  const mimeType = file.type || "audio/wav";
+  const body = {
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text:
+              `${prompt}\n\nTranscribe this audio accurately. Output only the transcript text. ` +
+              "Keep Tunisian Derja in Arabic script and write all French/English words in correct Latin spelling with accents, e.g. lycée not ليسي or lyci.",
+          },
+          { inlineData: { mimeType, data: audioBase64 } },
+        ],
+      },
+    ],
+    generationConfig: { temperature: 0 },
+  };
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(geminiKey)}`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+  );
+  if (!res.ok) throw new Error(`Gemini audio transcription failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
+  const json = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+  return normalizeTranscript(json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join(" ") ?? "");
+}
+
+function normalizeTranscript(input: string): string {
+  return normalizeLoanwords(dedupeRepeats(input.replace(/^```(?:text)?|```$/g, "").trim()));
+}
+
+async function alignSegmentsToReference(segments: PolishSeg[], referenceText: string): Promise<PolishSeg[]> {
+  if (segments.length === 0 || !referenceText.trim()) return segments;
+  const payload = segments.map((s) => ({ id: s.id, start: s.start, end: s.end, roughText: s.text }));
+  const content = await geminiChat({
+    model: "gemini-2.5-flash",
+    jsonMode: true,
+    temperature: 0,
+    system:
+      "You align a corrected transcript to existing subtitle timestamps. Return JSON only. " +
+      "Do not translate or rewrite. Split the corrected transcript across the provided segment ids in order. " +
+      "Keep Derja Arabic in Arabic script and French/English words in correct Latin spelling.",
+    user: JSON.stringify({ correctedTranscript: referenceText, segments: payload }),
+  });
+  const parsed = parseJsonArray(content);
+  if (!parsed.length) return splitReferenceBySegmentWeights(segments, referenceText);
+  const byId = new Map<number, string>();
+  for (const item of parsed) {
+    if (typeof item.id === "number" && typeof item.text === "string") byId.set(item.id, normalizeTranscript(item.text));
+  }
+  return segments.map((s) => ({ ...s, text: byId.get(s.id) || s.text }));
+}
+
+function splitReferenceBySegmentWeights(segments: PolishSeg[], referenceText: string): PolishSeg[] {
+  const tokens = normalizeTranscript(referenceText).split(/\s+/).filter(Boolean);
+  if (!tokens.length || !segments.length) return segments;
+  const weights = segments.map((s) => Math.max(1, s.text.split(/\s+/).filter(Boolean).length));
+  const total = weights.reduce((sum, n) => sum + n, 0);
+  let cursor = 0;
+  return segments.map((s, i) => {
+    const remainingSegments = segments.length - i;
+    const remainingTokens = tokens.length - cursor;
+    const wanted = i === segments.length - 1 ? remainingTokens : Math.max(1, Math.round((tokens.length * weights[i]) / total));
+    const count = Math.min(Math.max(1, wanted), Math.max(1, remainingTokens - remainingSegments + 1));
+    const text = tokens.slice(cursor, cursor + count).join(" ");
+    cursor += count;
+    return { ...s, text: text || s.text };
+  });
+}
+
+function parseJsonArray(content: string): Array<{ id?: number; text?: string }> {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (Array.isArray(parsed)) return parsed as Array<{ id?: number; text?: string }>;
+    const wrapped = parsed as { segments?: unknown };
+    if (Array.isArray(wrapped.segments)) return wrapped.segments as Array<{ id?: number; text?: string }>;
+  } catch {
+    const match = content.match(/\[[\s\S]*\]/);
+    if (match) return parseJsonArray(match[0]);
+  }
+  return [];
+}
+
 // Use the configured AI to fix spelling, spacing and punctuation in Derja segments
 // while preserving the original wording and meaning. Returns same shape with
 // cleaned text. Throws on hard failure; caller falls back to raw segments.
