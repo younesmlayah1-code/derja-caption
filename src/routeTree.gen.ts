@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as BetaRouteImport } from './routes/beta'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiYoutubeFetchRouteImport } from './routes/api/youtube-fetch'
 import { Route as ApiTransliterateRouteImport } from './routes/api/transliterate'
@@ -16,6 +17,11 @@ import { Route as ApiTranslateEnRouteImport } from './routes/api/translate-en'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiSuggestClipRouteImport } from './routes/api/suggest-clip'
 
+const BetaRoute = BetaRouteImport.update({
+  id: '/beta',
+  path: '/beta',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -49,6 +55,7 @@ const ApiSuggestClipRoute = ApiSuggestClipRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/beta': typeof BetaRoute
   '/api/suggest-clip': typeof ApiSuggestClipRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/translate-en': typeof ApiTranslateEnRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/beta': typeof BetaRoute
   '/api/suggest-clip': typeof ApiSuggestClipRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/translate-en': typeof ApiTranslateEnRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/beta': typeof BetaRoute
   '/api/suggest-clip': typeof ApiSuggestClipRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/translate-en': typeof ApiTranslateEnRoute
@@ -76,6 +85,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/beta'
     | '/api/suggest-clip'
     | '/api/transcribe'
     | '/api/translate-en'
@@ -84,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/beta'
     | '/api/suggest-clip'
     | '/api/transcribe'
     | '/api/translate-en'
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/beta'
     | '/api/suggest-clip'
     | '/api/transcribe'
     | '/api/translate-en'
@@ -101,6 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BetaRoute: typeof BetaRoute
   ApiSuggestClipRoute: typeof ApiSuggestClipRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiTranslateEnRoute: typeof ApiTranslateEnRoute
@@ -110,6 +123,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/beta': {
+      id: '/beta'
+      path: '/beta'
+      fullPath: '/beta'
+      preLoaderRoute: typeof BetaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -157,6 +177,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BetaRoute: BetaRoute,
   ApiSuggestClipRoute: ApiSuggestClipRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiTranslateEnRoute: ApiTranslateEnRoute,
@@ -166,13 +187,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

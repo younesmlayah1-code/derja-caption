@@ -57,19 +57,72 @@ function splitLongSegments(segs: Segment[]): Segment[] {
   return out;
 }
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/beta")({
   head: () => ({
     meta: [
-      { title: "Derja Subtitle Extractor — Tunisian Arabic captions from video" },
-      {
-        name: "description",
-        content:
-          "Upload a video and extract Tunisian Arabic (Derja) subtitles with English translation, line- or word-level.",
-      },
+      { title: "Beta — Derja + YouTube + AI Clip" },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
-  component: Home,
+  component: BetaGate,
 });
+
+const BETA_PASSWORD = "youyou2010";
+const BETA_KEY = "beta-auth-v1";
+
+function BetaGate() {
+  const [authed, setAuthed] = useState(false);
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem(BETA_KEY) === "1") {
+      setAuthed(true);
+    }
+  }, []);
+
+  if (authed) return <Home />;
+
+  return (
+    <main className="flex min-h-screen w-full items-center justify-center px-4">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (pw === BETA_PASSWORD) {
+            sessionStorage.setItem(BETA_KEY, "1");
+            setAuthed(true);
+          } else {
+            setErr("Wrong password.");
+          }
+        }}
+        className="w-full max-w-sm space-y-4 rounded-3xl border border-border bg-card/40 p-6 backdrop-blur"
+      >
+        <div>
+          <h1 className="text-xl font-semibold">Beta access</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Enter the password to continue.</p>
+        </div>
+        <input
+          type="password"
+          autoFocus
+          value={pw}
+          onChange={(e) => {
+            setPw(e.target.value);
+            setErr(null);
+          }}
+          placeholder="Password"
+          className="w-full rounded-xl border border-border bg-background/80 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+        {err && <p className="text-xs text-destructive-foreground">{err}</p>}
+        <button
+          type="submit"
+          className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Unlock
+        </button>
+      </form>
+    </main>
+  );
+}
 
 const ACCEPTED = [
   "video/mp4",
@@ -535,7 +588,8 @@ function Home() {
             Extractor
           </h1>
           <p className="mx-auto mt-4 max-w-md text-sm text-muted-foreground md:text-base">
-            Upload a video. Get Derja or English captions, line- or word-level.
+            Upload a video or paste a YouTube link. Get Derja or English captions, line- or
+            word-level, and let AI pick the best 2–4 min short.
           </p>
         </header>
 
@@ -710,6 +764,38 @@ function Home() {
               )}
             </section>
 
+            {!file && (
+              <section className="mt-5 rounded-3xl border border-border bg-card/30 p-5 backdrop-blur md:p-6">
+                <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                  <Youtube className="h-4 w-4 text-primary" />
+                  Or paste a YouTube link
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    type="url"
+                    placeholder="https://www.youtube.com/watch?v=…"
+                    value={ytUrl}
+                    onChange={(e) => setYtUrl(e.target.value)}
+                    disabled={ytLoading}
+                    className="flex-1 rounded-xl border border-border bg-background/80 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                  <button
+                    onClick={fetchYouTube}
+                    disabled={ytLoading || !ytUrl.trim()}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {ytLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    {ytLoading ? "Fetching…" : "Fetch MP4"}
+                  </button>
+                </div>
+                {ytError && (
+                  <p className="mt-2 text-xs text-destructive-foreground">{ytError}</p>
+                )}
+                <p className="mt-2 text-xs text-muted-foreground/70">
+                  Resolves the smallest MP4 with audio for transcription. Long videos may take a while.
+                </p>
+              </section>
+            )}
           </>
         )}
 
@@ -766,6 +852,56 @@ function Home() {
               )}
             </div>
 
+            {/* AI clip suggestion */}
+            <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  AI-picked short clip (2–4 min)
+                </h3>
+                <button
+                  onClick={suggestClip}
+                  disabled={clipLoading}
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {clipLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Scissors className="h-3.5 w-3.5" />
+                  )}
+                  {clip ? "Re-pick" : "Suggest best clip"}
+                </button>
+              </div>
+              {clipError && (
+                <p className="mb-2 text-xs text-destructive-foreground">{clipError}</p>
+              )}
+              {clip ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-baseline gap-3">
+                    <span className="rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
+                      {fmtTime(clip.start)} → {fmtTime(clip.end)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {Math.round(clip.end - clip.start)}s · {clip.title}
+                    </span>
+                  </div>
+                  {clip.reason && (
+                    <p className="text-sm text-muted-foreground">{clip.reason}</p>
+                  )}
+                  <button
+                    onClick={exportClipSrt}
+                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-xs hover:border-primary/50 hover:bg-primary/10"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download clip SRT
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground/70">
+                  Lovable AI scans your transcript and picks the most engaging 2–4 minute segment.
+                </p>
+              )}
+            </div>
 
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
