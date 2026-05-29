@@ -1,6 +1,5 @@
 import type { Segment, Word } from "./subtitles";
-import { extractMonoWavChunks, type AudioChunk } from "./audio";
-import { authedFetch } from "./api-client";
+import { extractMonoWavChunks } from "./audio";
 
 export type LoadProgress = {
   status: string;
@@ -23,103 +22,67 @@ export type RateInfo = {
   remainingRequests: number | null;
 };
 
-type ChunkResult = {
-  text: string;
-  segments: Segment[];
-  words: Word[];
-  rate: RateInfo | null;
-};
-
-const CONCURRENCY = 3;
-
-async function transcribeChunk(chunk: AudioChunk, idx: number, language?: string): Promise<ChunkResult> {
-  const fd = new FormData();
-  fd.append("file", chunk.blob, `audio_${idx}.wav`);
-  if (language) fd.append("language", language);
-
-  const res = await authedFetch("/api/transcribe", { method: "POST", body: fd });
-  if (!res.ok) {
-    let msg = `Transcription failed (${res.status}).`;
-    try {
-      const j = (await res.json()) as { error?: string };
-      if (j.error) msg = j.error;
-    } catch {
-      // ignore
-    }
-    throw new Error(msg);
-  }
-
-  const data = (await res.json()) as {
-    text: string;
-    segments: Segment[];
-    words?: Word[];
-    rate?: RateInfo;
-  };
-
-  const offset = chunk.startSec;
-  const words: Word[] = (data.words || []).map((w) => ({
-    start: w.start + offset,
-    end: w.end + offset,
-    text: w.text,
-  }));
-  const segments: Segment[] = (data.segments || []).map((s) => ({
-    id: s.id,
-    start: s.start + offset,
-    end: s.end + offset,
-    text: s.text,
-    words: s.words?.map((w) => ({
-      start: w.start + offset,
-      end: w.end + offset,
-      text: w.text,
-    })),
-  }));
-
-  return { text: (data.text || "").trim(), segments, words, rate: data.rate ?? null };
-}
-
 export async function transcribeFile(
   file: File,
   _onModelProgress?: (p: LoadProgress) => void,
   onProgress?: TranscribeProgress,
-  language?: string,
 ): Promise<{ text: string; segments: Segment[]; words: Word[]; rate: RateInfo | null }> {
   onProgress?.({ stage: "extracting" });
   const chunks = await extractMonoWavChunks(file);
-  const total = chunks.length;
 
-  onProgress?.({ stage: "uploading", chunkIndex: 1, chunkCount: total });
-
-  // Run chunks in parallel with bounded concurrency. Order-preserving via index.
-  const results: ChunkResult[] = new Array(total);
-  let nextIndex = 0;
-  let completed = 0;
-
-  async function worker() {
-    while (true) {
-      const i = nextIndex++;
-      if (i >= total) return;
-      onProgress?.({ stage: "transcribing", chunkIndex: i + 1, chunkCount: total });
-      results[i] = await transcribeChunk(chunks[i], i, language);
-      completed++;
-      onProgress?.({ stage: "transcribing", chunkIndex: completed, chunkCount: total });
-    }
-  }
-
-  const workerCount = Math.min(CONCURRENCY, total);
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-
-  // Stitch in chunk order, re-assigning monotonic segment ids.
   const allSegments: Segment[] = [];
   const allWords: Word[] = [];
   const textParts: string[] = [];
   let segId = 0;
   let lastRate: RateInfo | null = null;
 
-  for (const r of results) {
-    if (r.text) textParts.push(r.text);
-    if (r.rate) lastRate = r.rate;
-    for (const w of r.words) allWords.push(w);
-    for (const s of r.segments) allSegments.push({ ...s, id: segId++ });
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    onProgress?.({ stage: "uploading", chunkIndex: i + 1, chunkCount: chunks.length });
+
+    const fd = new FormData();
+    fd.append("file", chunk.blob, `audio_${i}.wav`);
+
+    onProgress?.({ stage: "transcribing", chunkIndex: i + 1, chunkCount: chunks.length });
+
+    const res = await fetch("/api/transcribe", { method: "POST", body: fd });
+    if (!res.ok) {
+      let msg = `Transcription failed (${res.status}).`;
+      try {
+        const j = (await res.json()) as { error?: string };
+        if (j.error) msg = j.error;
+      } catch {
+        // ignore
+      }
+      throw new Error(msg);
+    }
+
+    const data = (await res.json()) as { text: string; segments: Segment[]; words?: Word[]; rate?: RateInfo };
+    const text = (data.text || "").trim();
+    if (text) textParts.push(text);
+    if (data.rate) lastRate = data.rate;
+
+    for (const w of data.words || []) {
+      allWords.push({
+        start: w.start + chunk.startSec,
+        end: w.end + chunk.startSec,
+        text: w.text,
+      });
+    }
+
+    for (const s of data.segments || []) {
+      allSegments.push({
+        id: segId++,
+        start: s.start + chunk.startSec,
+        end: s.end + chunk.startSec,
+        text: s.text,
+        words: s.words?.map((w) => ({
+          start: w.start + chunk.startSec,
+          end: w.end + chunk.startSec,
+          text: w.text,
+        })),
+      });
+    }
   }
 
   return { text: textParts.join(" "), segments: allSegments, words: allWords, rate: lastRate };
