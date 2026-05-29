@@ -14,6 +14,7 @@ import {
   Plus,
   X,
   Home,
+  ArrowLeft,
   Infinity as InfinityIcon,
   CheckCircle2,
   CircleSlash,
@@ -167,6 +168,12 @@ function AdminLogin() {
           {busy && <Loader2 className="h-4 w-4 animate-spin" />}
           Sign in
         </button>
+        <Link
+          to="/login"
+          className="mx-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-3 w-3" /> Back to user login
+        </Link>
       </form>
     </main>
   );
