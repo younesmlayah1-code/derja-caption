@@ -28,7 +28,11 @@ async function getFFmpeg(): Promise<FFmpeg> {
       });
     } catch (localError) {
       console.warn("local ffmpeg core failed, trying CDN fallback:", localError);
-      try { ff.terminate(); } catch { /* ignore */ }
+      try {
+        ff.terminate();
+      } catch {
+        /* ignore */
+      }
       ff = new FFmpeg();
       ff.on("log", logHandler);
       await ff.load({
@@ -56,66 +60,98 @@ async function runCut(
   const ss = startSec.toFixed(3);
   const t = duration.toFixed(3);
   const commonMaps = ["-map", "0:v:0?", "-map", "0:a:0?", "-sn", "-dn"];
-  const args = mode === "fast-copy"
-    ? [
-        "-hide_banner",
-        "-ss", ss,
-        "-i", inputName,
-        "-t", t,
-        ...commonMaps,
-        "-c", "copy",
-        "-avoid_negative_ts", "make_zero",
-        "-movflags", "+faststart",
-        outputName,
-      ]
-    : mode === "copy"
+  const args =
+    mode === "fast-copy"
       ? [
           "-hide_banner",
-          "-i", inputName,
-          "-ss", ss,
-          "-t", t,
+          "-ss",
+          ss,
+          "-i",
+          inputName,
+          "-t",
+          t,
           ...commonMaps,
-          "-c", "copy",
-          "-avoid_negative_ts", "make_zero",
-          "-movflags", "+faststart",
+          "-c",
+          "copy",
+          "-avoid_negative_ts",
+          "make_zero",
+          "-movflags",
+          "+faststart",
           outputName,
         ]
-      : [
-          "-hide_banner",
-          "-ss", ss,
-          "-i", inputName,
-          "-t", t,
-          ...commonMaps,
-          "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-          "-c:v", "libx264",
-          "-preset", "ultrafast",
-          "-crf", "28",
-          "-profile:v", "baseline",
-          "-pix_fmt", "yuv420p",
-          "-c:a", "aac",
-          "-b:a", "128k",
-          "-ar", "44100",
-          "-ac", "2",
-          "-movflags", "+faststart",
-          outputName,
-        ];
+      : mode === "copy"
+        ? [
+            "-hide_banner",
+            "-i",
+            inputName,
+            "-ss",
+            ss,
+            "-t",
+            t,
+            ...commonMaps,
+            "-c",
+            "copy",
+            "-avoid_negative_ts",
+            "make_zero",
+            "-movflags",
+            "+faststart",
+            outputName,
+          ]
+        : [
+            "-hide_banner",
+            "-ss",
+            ss,
+            "-i",
+            inputName,
+            "-t",
+            t,
+            ...commonMaps,
+            "-vf",
+            "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-crf",
+            "28",
+            "-profile:v",
+            "baseline",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            "-movflags",
+            "+faststart",
+            outputName,
+          ];
   return ff.exec(args);
 }
 
 function resetFFmpeg() {
   if (ffmpegInstance) {
-    try { ffmpegInstance.terminate(); } catch { /* ignore */ }
+    try {
+      ffmpegInstance.terminate();
+    } catch {
+      /* ignore */
+    }
   }
   ffmpegInstance = null;
   loadPromise = null;
 }
 
 function errorDetails(error: unknown) {
-  const message = error instanceof Error && error.message
-    ? error.message
-    : typeof error === "string" && error
-      ? error
-      : "browser video encoder stopped unexpectedly";
+  const message =
+    error instanceof Error && error.message
+      ? error.message
+      : typeof error === "string" && error
+        ? error
+        : "browser video encoder stopped unexpectedly";
   const tail = recentLogs.slice(-10).join(" | ");
   return tail ? `${message}. ${tail.slice(0, 500)}` : message;
 }
@@ -145,9 +181,15 @@ export async function cutMp4Clip(
   try {
     try {
       await ff.createDir("/input");
-    } catch { /* already exists */ }
+    } catch {
+      /* already exists */
+    }
     try {
-      await ff.mount(FFFSType.WORKERFS, { files: [new File([file], inputFileName, { type: file.type })] }, "/input");
+      await ff.mount(
+        FFFSType.WORKERFS,
+        { files: [new File([file], inputFileName, { type: file.type })] },
+        "/input",
+      );
       mounted = true;
     } catch (mountError) {
       console.warn("ffmpeg WORKERFS mount failed, copying file instead:", mountError);
@@ -159,7 +201,11 @@ export async function cutMp4Clip(
     let outputBytes: Uint8Array | null = null;
     for (const mode of ["fast-copy", "copy", "reencode"] as const) {
       try {
-        try { await ff.deleteFile(outputName); } catch { /* ignore */ }
+        try {
+          await ff.deleteFile(outputName);
+        } catch {
+          /* ignore */
+        }
         const code = await runCut(ff, inputName, outputName, startSec, duration, mode);
         if (code === 0) {
           const data = await ff.readFile(outputName);
@@ -192,12 +238,28 @@ export async function cutMp4Clip(
   } finally {
     ff.off("progress", progressHandler);
     if (mounted) {
-      try { await ff.unmount("/input"); } catch { /* ignore */ }
-      try { await ff.deleteDir("/input"); } catch { /* ignore */ }
+      try {
+        await ff.unmount("/input");
+      } catch {
+        /* ignore */
+      }
+      try {
+        await ff.deleteDir("/input");
+      } catch {
+        /* ignore */
+      }
     } else {
-      try { await ff.deleteFile(inputName); } catch { /* ignore */ }
+      try {
+        await ff.deleteFile(inputName);
+      } catch {
+        /* ignore */
+      }
     }
-    try { await ff.deleteFile(outputName); } catch { /* ignore */ }
+    try {
+      await ff.deleteFile(outputName);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
