@@ -7,14 +7,20 @@ export const Route = createFileRoute("/api/transcribe")({
       POST: async ({ request }) => {
         const apiKey = process.env.GROQ_API_KEY;
         if (!apiKey) {
-          return Response.json({ error: "GROQ_API_KEY is not configured on the server." }, { status: 500 });
+          return Response.json(
+            { error: "GROQ_API_KEY is not configured on the server." },
+            { status: 500 },
+          );
         }
 
         let incoming: FormData;
         try {
           incoming = await request.formData();
         } catch {
-          return Response.json({ error: "Expected multipart/form-data with a 'file' field." }, { status: 400 });
+          return Response.json(
+            { error: "Expected multipart/form-data with a 'file' field." },
+            { status: 400 },
+          );
         }
 
         const file = incoming.get("file");
@@ -35,9 +41,9 @@ export const Route = createFileRoute("/api/transcribe")({
         // forcing everything into Arabic script.
         const derjaPrompt =
           "فرّغ الكلام باللهجة التونسية الدارجة كما هو، لا تحوّله للفصحى. " +
-          "الكلام العربي اكتبه بالحروف العربية، وأي كلمة فرنسية أو إنجليزية منطوقة اكتبها بلغتها وبحروف Latin الأصلية. " +
-          "أمثلة: montage, business, marketing, problème, service. " +
-          "أمثلة كلمات دارجة: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، باهي، موش، ماكش، توا، يعيشك، زادا، خاطر، نحب، نجم، نمشي، نشوف، نحكي، فما، أما، إيا.";
+          "الكلام العربي/الدارجة اكتبه بالحروف العربية، لكن أي كلمة فرنسية أو إنجليزية منطوقة اكتبها بلغتها الأصلية وبحروف Latin، لا تكتبها بحروف عربية. " +
+          "أمثلة فرنسي/إنجليزي لازم تبقى Latin: produit, montage, business, marketing, problème, service, réseau, rendez-vous, téléphone, ordinateur, boutique, email, wifi, download, link. " +
+          "أمثلة كلمات دارجة تبقى عربية: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، باهي، موش، ماكش، توا، يعيشك، زادا، خاطر، نحب، نجم، نمشي، نشوف، نحكي، فما، أما، إيا.";
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
@@ -68,11 +74,13 @@ export const Route = createFileRoute("/api/transcribe")({
           words?: Array<{ word?: string; text?: string; start: number; end: number }>;
         };
 
-        const allWords = (data.words ?? []).map((w) => ({
-          start: w.start,
-          end: w.end,
-          text: ((w.word ?? w.text) || "").trim(),
-        })).filter((w) => w.text.length > 0);
+        const allWords = (data.words ?? [])
+          .map((w) => ({
+            start: w.start,
+            end: w.end,
+            text: normalizeLoanwords(((w.word ?? w.text) || "").trim()),
+          }))
+          .filter((w) => w.text.length > 0);
 
         // Assign each word to the segment whose [start,end] contains its
         // midpoint. Guarantees every word lands in exactly one segment — no
@@ -81,7 +89,7 @@ export const Route = createFileRoute("/api/transcribe")({
           id: typeof s.id === "number" ? s.id : i,
           start: s.start,
           end: s.end,
-          text: dedupeRepeats((s.text || "").trim()),
+          text: normalizeLoanwords(dedupeRepeats((s.text || "").trim())),
           words: [] as typeof allWords,
         }));
         for (const w of allWords) {
@@ -93,7 +101,10 @@ export const Route = createFileRoute("/api/transcribe")({
             let bestDist = Infinity;
             for (let i = 0; i < segs.length; i++) {
               const d = Math.min(Math.abs(mid - segs[i].start), Math.abs(mid - segs[i].end));
-              if (d < bestDist) { bestDist = d; best = i; }
+              if (d < bestDist) {
+                bestDist = d;
+                best = i;
+              }
             }
             idx = best;
           }
@@ -104,16 +115,21 @@ export const Route = createFileRoute("/api/transcribe")({
         // Drop segments that became empty after dedupe.
         const segments = rawSegments.filter((s) => s.text.length > 0);
 
-        // Polish spelling, spacing, and punctuation with Lovable AI while
+        // Polish spelling, spacing, and punctuation with the configured AI while
         // preserving the original Derja words and meaning. Failures here are
         // non-fatal — we fall back to the raw Whisper output.
-        const polishedSegments = await polishSegments(segments).catch((e: unknown) => {
-          console.error("polishSegments failed:", e);
-          return segments;
-        });
+        const polishedSegments = (
+          await polishSegments(segments).catch((e: unknown) => {
+            console.error("polishSegments failed:", e);
+            return segments;
+          })
+        ).map(syncWordsToSegmentText);
 
-        const fullText = polishedSegments.map((s: { text: string }) => s.text).join(" ").trim()
-          || dedupeRepeats((data.text || "").trim());
+        const fullText =
+          polishedSegments
+            .map((s: { text: string }) => s.text)
+            .join(" ")
+            .trim() || normalizeLoanwords(dedupeRepeats((data.text || "").trim()));
 
         // Forward Groq rate-limit headers so the UI can show "minutes left today".
         const h = res.headers;
@@ -125,11 +141,21 @@ export const Route = createFileRoute("/api/transcribe")({
           remainingRequests: numOrNull(h.get("x-ratelimit-remaining-requests")),
         };
 
-        return Response.json({ text: fullText, segments: polishedSegments, words: allWords, rate });
+        const polishedWords = polishedSegments.flatMap((s) => s.words ?? []);
+
+        return Response.json({
+          text: fullText,
+          segments: polishedSegments,
+          words: polishedWords,
+          rate,
+        });
       },
     },
   },
 });
+
+type PolishWord = { start: number; end: number; text: string };
+type PolishSeg = { id: number; start: number; end: number; text: string; words?: PolishWord[] };
 
 function numOrNull(v: string | null): number | null {
   if (v == null) return null;
@@ -137,9 +163,96 @@ function numOrNull(v: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-type PolishSeg = { id: number; start: number; end: number; text: string };
+const WORD_EDGE = "[\\s،,.؟!?;:؛()\\[\\]{}\\\"'«»]";
+const LOANWORD_FIXES: Array<[string, string]> = [
+  ["برودوي|برودوا|برودو|produi(?:t)?", "produit"],
+  ["بروجي|بروجاي|projet", "projet"],
+  ["بروبليم|بروبلام|بروبلم|problem(?:e)?", "problème"],
+  ["سارفيس|سيرفيس|service", "service"],
+  ["مونطاج|مونتاج|montage", "montage"],
+  ["بيزناس|بزنس|business", "business"],
+  ["ماركيتينغ|ماركتينج|ماركتينغ|marketing", "marketing"],
+  ["أورديناتور|اورديناتور|ورديناتور|ordinateur", "ordinateur"],
+  ["تيليفون|تليفون|طيليفون|telephone|téléphone", "téléphone"],
+  ["ريزو|reseau|réseau", "réseau"],
+  ["روندي[ -]?فو|رونديفو|rendez[ -]?vous", "rendez-vous"],
+  ["بوتيك|boutique", "boutique"],
+  ["ريستو|ريسطو|resto", "resto"],
+  ["ريستوران|restaurant", "restaurant"],
+  ["كافي|كافيه|cafe|café", "café"],
+  ["فاكتور|facture", "facture"],
+  ["كاميون|camion", "camion"],
+  ["طوموبيل|طوموبيلة|اوتوموبيل|automobile", "automobile"],
+  ["ماشينة|ماكينة|machine", "machine"],
+  ["بانك|بنك|banque", "banque"],
+  ["فاميلا|فاميليا|famille", "famille"],
+  ["إيكول|ايكول|ليكول|école|ecole", "école"],
+  ["بيرو|bureau", "bureau"],
+  ["ميرسي|merci", "merci"],
+  ["سيلفوبلي|سيلفو بلي|s[’']?il vous plai(?:t|s)|s’il vous plaît", "s'il vous plaît"],
+  ["نورمالمون|normalement", "normalement"],
+  ["دييجا|ديجا|deja|déjà", "déjà"],
+  ["توجور|toujours", "toujours"],
+  ["شاريجور|شارجور|chargeur", "chargeur"],
+  ["فيديو|video|vidéo", "vidéo"],
+  ["إيميل|ايميل|email|e-mail", "email"],
+  ["كومبيوتر|كومبيوطر|computer", "computer"],
+  ["وايفاي|wifi|wi-fi", "wifi"],
+  ["داونلود|download", "download"],
+  ["لينك|link", "link"],
+  ["client|كليان|كليون", "client"],
+  ["commande|كوموند|كومند", "commande"],
+  ["livraison|ليفريزون|ليفريزون", "livraison"],
+  ["formation|فورماسيون", "formation"],
+  ["stage|ستاج", "stage"],
+  ["réunion|reunion|ريونيون", "réunion"],
+  ["application|ابليكاسيون|أبليكاسيون", "application"],
+  ["connexion|كونكسيون", "connexion"],
+  ["internet|انترنت|إنترنت", "internet"],
+  ["logiciel|لوجيسيال", "logiciel"],
+  ["facturation|فاكتوراسيون", "facturation"],
+];
 
-// Use Lovable AI to fix spelling, spacing and punctuation in Derja segments
+function normalizeLoanwords(input: string): string {
+  let out = input;
+  for (const [pattern, replacement] of LOANWORD_FIXES) {
+    out = out.replace(
+      new RegExp(`(^|${WORD_EDGE})(?:${pattern})(?=$|${WORD_EDGE})`, "giu"),
+      `$1${replacement}`,
+    );
+  }
+  return out
+    .replace(/\s+([،.؟!,?.])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function syncWordsToSegmentText(seg: PolishSeg): PolishSeg {
+  const srcWords = (seg.words ?? []).filter((w) => w.text);
+  const tokens = normalizeLoanwords(seg.text).split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return { ...seg, text: "", words: [] };
+  if (srcWords.length === tokens.length) {
+    return {
+      ...seg,
+      text: tokens.join(" "),
+      words: tokens.map((text, i) => ({ ...srcWords[i], text })),
+    };
+  }
+
+  const duration = Math.max(0.001, seg.end - seg.start);
+  const step = duration / tokens.length;
+  return {
+    ...seg,
+    text: tokens.join(" "),
+    words: tokens.map((text, i) => ({
+      start: seg.start + step * i,
+      end: seg.start + step * (i + 1),
+      text,
+    })),
+  };
+}
+
+// Use the configured AI to fix spelling, spacing and punctuation in Derja segments
 // while preserving the original wording and meaning. Returns same shape with
 // cleaned text. Throws on hard failure; caller falls back to raw segments.
 async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
@@ -147,6 +260,7 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return segments;
 
+  const fullContext = segments.map((s) => s.text).join("\n");
   const payload = segments.map((s) => ({ id: s.id, text: s.text }));
 
   const system =
@@ -157,6 +271,8 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
     "**القاعدة الأهم — الكلمات الفرنسية والإنجليزية:** " +
     "التوانسة يخلطون برشا كلمات فرنسية في كلامهم. Whisper غالباً يكتبها غلط بحروف عربية مشوهة أو حتى بحروف لاتينية خاطئة. " +
     "مهمتك الأساسية: اكتشف أي كلمة أصلها فرنسي أو إنجليزي وأعد كتابتها بالحروف اللاتينية وبالإملاء الفرنسي/الإنجليزي الصحيح 100%. " +
+    "استعمل سياق النص الكامل لتعرف الكلمة: صحح داخل كل segment لكن لا تغيّر ترتيب segments ولا ids. " +
+    "إذا الكلمة تنطق فرنسي/إنجليزي، ممنوع تتركها بحروف عربية حتى لو Whisper كتبها هكا. " +
     "\n" +
     "أمثلة تصحيحات شائعة (الخطأ ← الصحيح):\n" +
     "- برودوي/برودوا/produi → produit\n" +
@@ -199,9 +315,14 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
     "أرجع JSON فقط بنفس البنية: " +
     '[{"id":number,"text":string}, ...]';
 
-  const userMsg = JSON.stringify(payload);
+  const userMsg = JSON.stringify({ fullContext, segments: payload });
 
-  const content = await geminiChat({ system, user: userMsg, jsonMode: true, model: "gemini-2.5-pro" });
+  const content = await geminiChat({
+    system,
+    user: userMsg,
+    jsonMode: true,
+    model: "gemini-2.5-pro",
+  });
   if (!content) return segments;
 
   // Model may return either a bare array or an object wrapping it.
@@ -217,7 +338,7 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   const arr: Array<{ id?: number; text?: string }> = Array.isArray(parsed)
     ? (parsed as Array<{ id?: number; text?: string }>)
     : Array.isArray((parsed as { segments?: unknown }).segments)
-      ? ((parsed as { segments: Array<{ id?: number; text?: string }> }).segments)
+      ? (parsed as { segments: Array<{ id?: number; text?: string }> }).segments
       : [];
 
   if (arr.length === 0) return segments;
@@ -241,7 +362,7 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
 function dedupeRepeats(input: string): string {
   if (!input) return input;
   // Collapse runs of the same character (6+) down to 2: "اااااااا" -> "اا".
-  let s = input.replace(/(.)\1{5,}/g, "$1$1");
+  const s = input.replace(/(.)\1{5,}/g, "$1$1");
 
   const words = s.split(/\s+/).filter(Boolean);
   if (words.length < 3) return s.trim();
@@ -276,5 +397,8 @@ function dedupeRepeats(input: string): string {
     }
   }
 
-  return out.join(" ").replace(/\s+([،.؟!,?.])/g, "$1").trim();
+  return out
+    .join(" ")
+    .replace(/\s+([،.؟!,?.])/g, "$1")
+    .trim();
 }
