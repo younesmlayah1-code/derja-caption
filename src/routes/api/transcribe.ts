@@ -211,7 +211,106 @@ const LOANWORD_FIXES: Array<[string, string]> = [
   ["internet|انترنت|إنترنت", "internet"],
   ["logiciel|لوجيسيال", "logiciel"],
   ["facturation|فاكتوراسيون", "facturation"],
+  ["ليسي|ليسيه|lyci|lycee|lycée", "lycée"],
+  ["كوليج|college|collège", "collège"],
+  ["فاك|faculte|faculté", "faculté"],
+  ["يونيفرسيتي|université|universite", "université"],
+  ["بروف|بروفيسور|prof|professeur", "professeur"],
+  ["إيتيديون|étudiant|etudiant", "étudiant"],
+  ["باكالوريا|باك|bac|baccalauréat|baccalaureat", "baccalauréat"],
+  ["ديبلوم|diplome|diplôme", "diplôme"],
+  ["كور|cours", "cours"],
+  ["إكزامون|إكزامن|examen", "examen"],
+  ["نوت|notes?", "note"],
+  ["كاهيي|كاهي|cahier", "cahier"],
+  ["ليفر|livre", "livre"],
+  ["ستيلو|stylo", "stylo"],
+  ["ساك|sac", "sac"],
+  ["كلاس|classe", "classe"],
+  ["سوسيتي|société|societe", "société"],
+  ["كومباني|compagnie", "compagnie"],
+  ["أنتربريز|entreprise", "entreprise"],
+  ["بروجكت|projet", "projet"],
+  ["إيكيب|équipe|equipe", "équipe"],
+  ["شيف|chef", "chef"],
+  ["باترون|patron", "patron"],
+  ["كولاج|collègue|collegue", "collègue"],
+  ["سالار|salaire", "salaire"],
+  ["كونترا|contrat", "contrat"],
+  ["ميتيي|métier|metier", "métier"],
+  ["ترافاي|travail", "travail"],
+  ["بولو|boulot", "boulot"],
+  ["فيف|vie", "vie"],
+  ["مايزون|maison", "maison"],
+  ["أبارتمون|appartement", "appartement"],
+  ["شامبر|chambre", "chambre"],
+  ["كويزين|cuisine", "cuisine"],
+  ["سال|salle", "salle"],
+  ["جاردان|jardin", "jardin"],
+  ["فواتور|voiture", "voiture"],
+  ["بيرمي|permis", "permis"],
+  ["روت|route", "route"],
+  ["أوتوروت|autoroute", "autoroute"],
+  ["إسانس|essence", "essence"],
+  ["غازوال|gasoil|gazole", "gasoil"],
+  ["كنترول|contrôle|controle", "contrôle"],
+  ["بوليس|police", "police"],
+  ["دوكتور|docteur", "docteur"],
+  ["ميديسان|médecin|medecin", "médecin"],
+  ["فارماسي|pharmacie", "pharmacie"],
+  ["أوبيتال|hôpital|hopital", "hôpital"],
+  ["كليني|clinique", "clinique"],
+  ["رونديز فو|rendez vous", "rendez-vous"],
+  ["سوبيرماركي|supermarché|supermarche", "supermarché"],
+  ["ماغازا|magasin", "magasin"],
+  ["مارشي|marché|marche", "marché"],
+  ["برومو|promotion|promo", "promo"],
+  ["سولد|soldes?", "soldes"],
+  ["بريكس|prix", "prix"],
+  ["أرجون|argent", "argent"],
+  ["مونيي|monnaie", "monnaie"],
+  ["كارت|carte", "carte"],
+  ["كومبت|compte", "compte"],
+  ["شيك|chèque|cheque", "chèque"],
+  ["كريدي|crédit|credit", "crédit"],
+  ["ديبي|débit|debit", "débit"],
+  ["بيلي|billet", "billet"],
+  ["تيكي|ticket", "ticket"],
+  ["ريسي|reçu|recu", "reçu"],
+  ["كادو|cadeau", "cadeau"],
+  ["فيت|fête|fete", "fête"],
+  ["أنيفيرسير|anniversaire", "anniversaire"],
+  ["ماريياج|mariage", "mariage"],
+  ["فاكونس|vacances", "vacances"],
+  ["فوياج|voyage", "voyage"],
+  ["أفيون|avion", "avion"],
+  ["إيروبور|aéroport|aeroport", "aéroport"],
+  ["تران|train", "train"],
+  ["غار|gare", "gare"],
+  ["بيلاج|plage", "plage"],
+  ["مير|mer", "mer"],
+  ["موتاي|montagne", "montagne"],
+  ["أوتيل|hôtel|hotel", "hôtel"],
+  ["شامبر دوتيل|chambre d'hôtel", "chambre d'hôtel"],
+  ["ريزرفاسيون|réservation|reservation", "réservation"],
+  ["أسوروانس|assurance", "assurance"],
+  ["سيكوريتي|sécurité|securite", "sécurité"],
+  ["كاميرا|caméra|camera", "caméra"],
+  ["فوتو|photo", "photo"],
+  ["إيكران|écran|ecran", "écran"],
+  ["كلافيي|clavier", "clavier"],
+  ["سوري|souris", "souris"],
+  ["إيمبريمونت|imprimante", "imprimante"],
+  ["لوجيسيال|logiciel", "logiciel"],
+  ["لوغو|logo", "logo"],
+  ["ساي|site", "site"],
+  ["باج|page", "page"],
+  ["كومبت|compte", "compte"],
+  ["موط دو باس|mot de passe", "mot de passe"],
+  ["باسوورد|password", "password"],
+  ["لوغين|login", "login"],
 ];
+
 
 function normalizeLoanwords(input: string): string {
   let out = input;
@@ -317,13 +416,26 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
 
   const userMsg = JSON.stringify({ fullContext, segments: payload });
 
-  const content = await geminiChat({
-    system,
-    user: userMsg,
-    jsonMode: true,
-    model: "gemini-2.5-pro",
-  });
-  if (!content) return segments;
+  // Try flash first (high free-tier quota), fall back to pro if it fails,
+  // then 2.5-flash-lite as a last resort. This avoids the 429 quota errors
+  // that were silently dropping the polish step entirely.
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"];
+  let content = "";
+  let lastErr: unknown = null;
+  for (const model of models) {
+    try {
+      content = await geminiChat({ system, user: userMsg, jsonMode: true, model });
+      if (content) break;
+    } catch (e) {
+      lastErr = e;
+      console.error(`polishSegments: ${model} failed, trying fallback:`, e);
+    }
+  }
+  if (!content) {
+    if (lastErr) console.error("polishSegments: all models failed:", lastErr);
+    return segments;
+  }
+
 
   // Model may return either a bare array or an object wrapping it.
   let parsed: unknown;
