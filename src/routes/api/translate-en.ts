@@ -11,9 +11,9 @@ export const Route = createFileRoute("/api/translate-en")({
       POST: async ({ request }) => {
         const gate = await requireActiveUser(request);
         if (gate instanceof Response) return gate;
-        const key = await getSecret("LOVABLE_API_KEY");
+        const key = await getSecret("GEMINI_API_KEY");
         if (!key) {
-          return Response.json({ error: "LOVABLE_API_KEY is not configured." }, { status: 500 });
+          return Response.json({ error: "GEMINI_API_KEY is not configured." }, { status: 500 });
         }
 
         let body: { items?: Item[]; mode?: "line" | "word"; targetLang?: "english" | "french" };
