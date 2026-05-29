@@ -70,163 +70,163 @@ async function runCut(
   switch (mode) {
     case "fast-copy":
       args = [
-          "-hide_banner",
-          "-ss",
-          ss,
-          "-i",
-          inputName,
-          "-t",
-          t,
-          ...commonMaps,
-          "-c",
-          "copy",
-          "-avoid_negative_ts",
-          "make_zero",
-          "-movflags",
-          "+faststart",
-          "-f",
-          "mp4",
-          outputName,
-        ];
+        "-hide_banner",
+        "-ss",
+        ss,
+        "-i",
+        inputName,
+        "-t",
+        t,
+        ...commonMaps,
+        "-c",
+        "copy",
+        "-avoid_negative_ts",
+        "make_zero",
+        "-movflags",
+        "+faststart",
+        "-f",
+        "mp4",
+        outputName,
+      ];
       break;
     case "copy":
       args = [
-            "-hide_banner",
-            "-i",
-            inputName,
-            "-ss",
-            ss,
-            "-t",
-            t,
-            ...commonMaps,
-            "-c",
-            "copy",
-            "-avoid_negative_ts",
-            "make_zero",
-            "-movflags",
-            "+faststart",
-            "-f",
-            "mp4",
-            outputName,
-          ];
+        "-hide_banner",
+        "-i",
+        inputName,
+        "-ss",
+        ss,
+        "-t",
+        t,
+        ...commonMaps,
+        "-c",
+        "copy",
+        "-avoid_negative_ts",
+        "make_zero",
+        "-movflags",
+        "+faststart",
+        "-f",
+        "mp4",
+        outputName,
+      ];
       break;
     case "remux-audio":
       args = [
-              "-hide_banner",
-              "-ss",
-              ss,
-              "-i",
-              inputName,
-              "-t",
-              t,
-              ...commonMaps,
-              "-c:v",
-              "copy",
-              "-c:a",
-              "aac",
-              "-b:a",
-              "128k",
-              "-movflags",
-              "+faststart",
-              "-f",
-              "mp4",
-              outputName,
-            ];
+        "-hide_banner",
+        "-ss",
+        ss,
+        "-i",
+        inputName,
+        "-t",
+        t,
+        ...commonMaps,
+        "-c:v",
+        "copy",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-movflags",
+        "+faststart",
+        "-f",
+        "mp4",
+        outputName,
+      ];
       break;
     case "h264-aac":
       args = [
-                "-hide_banner",
-                "-ss",
-                ss,
-                "-i",
-                inputName,
-                "-t",
-                t,
-                ...commonMaps,
-                "-vf",
-                safeScale,
-                "-c:v",
-                "libx264",
-                "-preset",
-                "ultrafast",
-                "-crf",
-                "30",
-                "-profile:v",
-                "baseline",
-                "-pix_fmt",
-                "yuv420p",
-                "-c:a",
-                "aac",
-                "-b:a",
-                "128k",
-                "-ar",
-                "44100",
-                "-ac",
-                "2",
-                "-movflags",
-                "+faststart",
-                "-f",
-                "mp4",
-                outputName,
-              ];
+        "-hide_banner",
+        "-ss",
+        ss,
+        "-i",
+        inputName,
+        "-t",
+        t,
+        ...commonMaps,
+        "-vf",
+        safeScale,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-crf",
+        "30",
+        "-profile:v",
+        "baseline",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-ar",
+        "44100",
+        "-ac",
+        "2",
+        "-movflags",
+        "+faststart",
+        "-f",
+        "mp4",
+        outputName,
+      ];
       break;
     case "native-mp4":
       args = [
-                  "-hide_banner",
-                  "-ss",
-                  ss,
-                  "-i",
-                  inputName,
-                  "-t",
-                  t,
-                  ...commonMaps,
-                  "-vf",
-                  safeScale,
-                  "-c:v",
-                  "mpeg4",
-                  "-q:v",
-                  "5",
-                  "-tag:v",
-                  "mp4v",
-                  "-c:a",
-                  "aac",
-                  "-b:a",
-                  "128k",
-                  "-movflags",
-                  "+faststart",
-                  "-f",
-                  "mp4",
-                  outputName,
-                ];
+        "-hide_banner",
+        "-ss",
+        ss,
+        "-i",
+        inputName,
+        "-t",
+        t,
+        ...commonMaps,
+        "-vf",
+        safeScale,
+        "-c:v",
+        "mpeg4",
+        "-q:v",
+        "5",
+        "-tag:v",
+        "mp4v",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-movflags",
+        "+faststart",
+        "-f",
+        "mp4",
+        outputName,
+      ];
       break;
     case "video-only":
       args = [
-                    "-hide_banner",
-                    "-ss",
-                    ss,
-                    "-i",
-                    inputName,
-                    "-t",
-                    t,
-                    "-map",
-                    "0:v:0?",
-                    "-an",
-                    "-sn",
-                    "-dn",
-                    "-vf",
-                    safeScale,
-                    "-c:v",
-                    "mpeg4",
-                    "-q:v",
-                    "5",
-                    "-tag:v",
-                    "mp4v",
-                    "-movflags",
-                    "+faststart",
-                    "-f",
-                    "mp4",
-                    outputName,
-                  ];
+        "-hide_banner",
+        "-ss",
+        ss,
+        "-i",
+        inputName,
+        "-t",
+        t,
+        "-map",
+        "0:v:0?",
+        "-an",
+        "-sn",
+        "-dn",
+        "-vf",
+        safeScale,
+        "-c:v",
+        "mpeg4",
+        "-q:v",
+        "5",
+        "-tag:v",
+        "mp4v",
+        "-movflags",
+        "+faststart",
+        "-f",
+        "mp4",
+        outputName,
+      ];
       break;
   }
   return ff.exec(args);
@@ -268,18 +268,36 @@ function pickRecorderMime() {
   );
 }
 
-function waitForVideoEvent(video: HTMLVideoElement, event: keyof HTMLMediaElementEventMap) {
+function waitForVideoEvent(
+  video: HTMLVideoElement,
+  event: keyof HTMLMediaElementEventMap,
+  timeoutMs = 15000,
+) {
   return new Promise<void>((resolve, reject) => {
+    let timer = 0;
     const onOk = () => cleanup(resolve);
     const onError = () => cleanup(() => reject(new Error(`Video ${event} failed.`)));
     const cleanup = (finish: () => void) => {
+      if (timer) window.clearTimeout(timer);
       video.removeEventListener(event, onOk);
       video.removeEventListener("error", onError);
       finish();
     };
     video.addEventListener(event, onOk, { once: true });
     video.addEventListener("error", onError, { once: true });
+    timer = window.setTimeout(
+      () => cleanup(() => reject(new Error(`Timed out waiting for video ${event}.`))),
+      timeoutMs,
+    );
   });
+}
+
+async function seekVideo(video: HTMLVideoElement, seconds: number) {
+  const target = Math.max(0, Math.min(seconds, Math.max(0, (video.duration || seconds) - 0.05)));
+  if (Math.abs(video.currentTime - target) < 0.05) return;
+  const seeked = waitForVideoEvent(video, "seeked", 12000);
+  video.currentTime = target;
+  await seeked;
 }
 
 async function recordClipFallback(
@@ -297,23 +315,29 @@ async function recordClipFallback(
   const video = document.createElement("video");
   const duration = Math.max(0.1, endSec - startSec);
   let progressTimer = 0;
+  let stopTimer = 0;
 
   video.src = url;
   video.preload = "auto";
   video.playsInline = true;
+  video.muted = true;
   video.volume = 0;
   video.style.cssText =
     "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
   document.body.appendChild(video);
 
   try {
-    await waitForVideoEvent(video, "loadedmetadata");
-    video.currentTime = Math.max(0, Math.min(startSec, Math.max(0, video.duration - 0.1)));
-    await waitForVideoEvent(video, "seeked");
+    if (video.readyState < 1) await waitForVideoEvent(video, "loadedmetadata");
+    await seekVideo(video, startSec);
+    if (video.readyState < 2) await waitForVideoEvent(video, "loadeddata", 12000);
 
     const stream =
-      (video as HTMLVideoElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream })
-        .captureStream?.() ??
+      (
+        video as HTMLVideoElement & {
+          captureStream?: () => MediaStream;
+          mozCaptureStream?: () => MediaStream;
+        }
+      ).captureStream?.() ??
       (video as HTMLVideoElement & { mozCaptureStream?: () => MediaStream }).mozCaptureStream?.();
     if (!stream || stream.getTracks().length === 0) {
       throw new Error("This browser cannot capture the selected video range.");
@@ -333,7 +357,10 @@ async function recordClipFallback(
       };
     });
 
+    let stoppedOnce = false;
     const stopRecording = () => {
+      if (stoppedOnce) return;
+      stoppedOnce = true;
       if (recorder.state !== "inactive") recorder.stop();
       video.pause();
     };
@@ -345,17 +372,13 @@ async function recordClipFallback(
       onProgress?.({ stage: "recording", pct, note: "Encoder fallback" });
     }, 500);
 
-    recorder.start(1000);
-    try {
-      await video.play();
-    } catch {
-      video.muted = true;
-      await video.play();
-    }
-    window.setTimeout(stopRecording, duration * 1000 + 1500);
+    recorder.start(250);
+    await video.play();
+    stopTimer = window.setTimeout(stopRecording, duration * 1000 + 1500);
     return await stopped;
   } finally {
     if (progressTimer) window.clearInterval(progressTimer);
+    if (stopTimer) window.clearTimeout(stopTimer);
     video.remove();
     URL.revokeObjectURL(url);
   }
@@ -368,22 +391,23 @@ export async function cutMp4Clip(
   onProgress?: ClipProgress,
 ): Promise<Blob> {
   onProgress?.({ stage: "loading" });
-  const ff = await getFFmpeg();
-
   const duration = Math.max(0.1, endSec - startSec);
   const inputFileName = "input" + extensionFor(file);
   let inputName = `/input/${inputFileName}`;
   const outputName = `clip-${Date.now()}.mp4`;
+  let ff: FFmpeg | null = null;
   let mounted = false;
 
   const progressHandler = ({ progress }: { progress: number }) => {
     onProgress?.({ stage: "cutting", pct: Math.max(0, Math.min(1, progress)) });
   };
-  ff.on("progress", progressHandler);
 
   recentLogs.length = 0;
 
   try {
+    ff = await getFFmpeg();
+    ff.on("progress", progressHandler);
+
     try {
       await ff.createDir("/input");
     } catch {
@@ -455,29 +479,31 @@ export async function cutMp4Clip(
       throw new Error(`${errorDetails(e)}. Fallback failed: ${errorDetails(fallbackError)}`);
     }
   } finally {
-    ff.off("progress", progressHandler);
-    if (mounted) {
+    if (ff) {
+      ff.off("progress", progressHandler);
+      if (mounted) {
+        try {
+          await ff.unmount("/input");
+        } catch {
+          /* ignore */
+        }
+        try {
+          await ff.deleteDir("/input");
+        } catch {
+          /* ignore */
+        }
+      } else {
+        try {
+          await ff.deleteFile(inputName);
+        } catch {
+          /* ignore */
+        }
+      }
       try {
-        await ff.unmount("/input");
+        await ff.deleteFile(outputName);
       } catch {
         /* ignore */
       }
-      try {
-        await ff.deleteDir("/input");
-      } catch {
-        /* ignore */
-      }
-    } else {
-      try {
-        await ff.deleteFile(inputName);
-      } catch {
-        /* ignore */
-      }
-    }
-    try {
-      await ff.deleteFile(outputName);
-    } catch {
-      /* ignore */
     }
   }
 }
