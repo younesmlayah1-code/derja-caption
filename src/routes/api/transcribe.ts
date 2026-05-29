@@ -7,14 +7,20 @@ export const Route = createFileRoute("/api/transcribe")({
       POST: async ({ request }) => {
         const apiKey = process.env.GROQ_API_KEY;
         if (!apiKey) {
-          return Response.json({ error: "GROQ_API_KEY is not configured on the server." }, { status: 500 });
+          return Response.json(
+            { error: "GROQ_API_KEY is not configured on the server." },
+            { status: 500 },
+          );
         }
 
         let incoming: FormData;
         try {
           incoming = await request.formData();
         } catch {
-          return Response.json({ error: "Expected multipart/form-data with a 'file' field." }, { status: 400 });
+          return Response.json(
+            { error: "Expected multipart/form-data with a 'file' field." },
+            { status: 400 },
+          );
         }
 
         const file = incoming.get("file");
@@ -68,11 +74,13 @@ export const Route = createFileRoute("/api/transcribe")({
           words?: Array<{ word?: string; text?: string; start: number; end: number }>;
         };
 
-        const allWords = (data.words ?? []).map((w) => ({
-          start: w.start,
-          end: w.end,
-          text: normalizeLoanwords(((w.word ?? w.text) || "").trim()),
-        })).filter((w) => w.text.length > 0);
+        const allWords = (data.words ?? [])
+          .map((w) => ({
+            start: w.start,
+            end: w.end,
+            text: normalizeLoanwords(((w.word ?? w.text) || "").trim()),
+          }))
+          .filter((w) => w.text.length > 0);
 
         // Assign each word to the segment whose [start,end] contains its
         // midpoint. Guarantees every word lands in exactly one segment — no
@@ -93,7 +101,10 @@ export const Route = createFileRoute("/api/transcribe")({
             let bestDist = Infinity;
             for (let i = 0; i < segs.length; i++) {
               const d = Math.min(Math.abs(mid - segs[i].start), Math.abs(mid - segs[i].end));
-              if (d < bestDist) { bestDist = d; best = i; }
+              if (d < bestDist) {
+                bestDist = d;
+                best = i;
+              }
             }
             idx = best;
           }
@@ -107,13 +118,18 @@ export const Route = createFileRoute("/api/transcribe")({
         // Polish spelling, spacing, and punctuation with Lovable AI while
         // preserving the original Derja words and meaning. Failures here are
         // non-fatal — we fall back to the raw Whisper output.
-        const polishedSegments = (await polishSegments(segments).catch((e: unknown) => {
-          console.error("polishSegments failed:", e);
-          return segments;
-        })).map(syncWordsToSegmentText);
+        const polishedSegments = (
+          await polishSegments(segments).catch((e: unknown) => {
+            console.error("polishSegments failed:", e);
+            return segments;
+          })
+        ).map(syncWordsToSegmentText);
 
-        const fullText = polishedSegments.map((s: { text: string }) => s.text).join(" ").trim()
-          || normalizeLoanwords(dedupeRepeats((data.text || "").trim()));
+        const fullText =
+          polishedSegments
+            .map((s: { text: string }) => s.text)
+            .join(" ")
+            .trim() || normalizeLoanwords(dedupeRepeats((data.text || "").trim()));
 
         // Forward Groq rate-limit headers so the UI can show "minutes left today".
         const h = res.headers;
@@ -127,7 +143,12 @@ export const Route = createFileRoute("/api/transcribe")({
 
         const polishedWords = polishedSegments.flatMap((s) => s.words ?? []);
 
-        return Response.json({ text: fullText, segments: polishedSegments, words: polishedWords, rate });
+        return Response.json({
+          text: fullText,
+          segments: polishedSegments,
+          words: polishedWords,
+          rate,
+        });
       },
     },
   },
@@ -195,9 +216,15 @@ const LOANWORD_FIXES: Array<[string, string]> = [
 function normalizeLoanwords(input: string): string {
   let out = input;
   for (const [pattern, replacement] of LOANWORD_FIXES) {
-    out = out.replace(new RegExp(`(^|${WORD_EDGE})(?:${pattern})(?=$|${WORD_EDGE})`, "giu"), `$1${replacement}`);
+    out = out.replace(
+      new RegExp(`(^|${WORD_EDGE})(?:${pattern})(?=$|${WORD_EDGE})`, "giu"),
+      `$1${replacement}`,
+    );
   }
-  return out.replace(/\s+([،.؟!,?.])/g, "$1").replace(/\s{2,}/g, " ").trim();
+  return out
+    .replace(/\s+([،.؟!,?.])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function syncWordsToSegmentText(seg: PolishSeg): PolishSeg {
@@ -205,7 +232,11 @@ function syncWordsToSegmentText(seg: PolishSeg): PolishSeg {
   const tokens = normalizeLoanwords(seg.text).split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return { ...seg, text: "", words: [] };
   if (srcWords.length === tokens.length) {
-    return { ...seg, text: tokens.join(" "), words: tokens.map((text, i) => ({ ...srcWords[i], text })) };
+    return {
+      ...seg,
+      text: tokens.join(" "),
+      words: tokens.map((text, i) => ({ ...srcWords[i], text })),
+    };
   }
 
   const duration = Math.max(0.001, seg.end - seg.start);
@@ -286,7 +317,12 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
 
   const userMsg = JSON.stringify({ fullContext, segments: payload });
 
-  const content = await geminiChat({ system, user: userMsg, jsonMode: true, model: "gemini-2.5-pro" });
+  const content = await geminiChat({
+    system,
+    user: userMsg,
+    jsonMode: true,
+    model: "gemini-2.5-pro",
+  });
   if (!content) return segments;
 
   // Model may return either a bare array or an object wrapping it.
@@ -302,7 +338,7 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   const arr: Array<{ id?: number; text?: string }> = Array.isArray(parsed)
     ? (parsed as Array<{ id?: number; text?: string }>)
     : Array.isArray((parsed as { segments?: unknown }).segments)
-      ? ((parsed as { segments: Array<{ id?: number; text?: string }> }).segments)
+      ? (parsed as { segments: Array<{ id?: number; text?: string }> }).segments
       : [];
 
   if (arr.length === 0) return segments;
@@ -326,7 +362,7 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
 function dedupeRepeats(input: string): string {
   if (!input) return input;
   // Collapse runs of the same character (6+) down to 2: "اااااااا" -> "اا".
-  let s = input.replace(/(.)\1{5,}/g, "$1$1");
+  const s = input.replace(/(.)\1{5,}/g, "$1$1");
 
   const words = s.split(/\s+/).filter(Boolean);
   if (words.length < 3) return s.trim();
@@ -361,5 +397,8 @@ function dedupeRepeats(input: string): string {
     }
   }
 
-  return out.join(" ").replace(/\s+([،.؟!,?.])/g, "$1").trim();
+  return out
+    .join(" ")
+    .replace(/\s+([،.؟!,?.])/g, "$1")
+    .trim();
 }
