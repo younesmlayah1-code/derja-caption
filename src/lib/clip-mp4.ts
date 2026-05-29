@@ -315,6 +315,7 @@ async function recordClipFallback(
   const video = document.createElement("video");
   const duration = Math.max(0.1, endSec - startSec);
   let progressTimer = 0;
+  let stopTimer = 0;
 
   video.src = url;
   video.preload = "auto";
@@ -352,7 +353,6 @@ async function recordClipFallback(
       };
     });
 
-    let stopTimer = 0;
     let stoppedOnce = false;
     const stopRecording = () => {
       if (stoppedOnce) return;
