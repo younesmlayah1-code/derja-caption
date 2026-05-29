@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Film, Loader2, Download, Upload, X, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Film, Loader2, Download, Upload, X, Sparkles, Clock } from "lucide-react";
 import {
   BURN_STYLES,
   type BurnStyle,
