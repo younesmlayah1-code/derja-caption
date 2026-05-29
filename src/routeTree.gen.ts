@@ -16,6 +16,7 @@ import { Route as ApiTransliterateRouteImport } from './routes/api/transliterate
 import { Route as ApiTranslateEnRouteImport } from './routes/api/translate-en'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiSuggestClipRouteImport } from './routes/api/suggest-clip'
+import { Route as ApiCutVideoRouteImport } from './routes/api/cut-video'
 
 const BetaRoute = BetaRouteImport.update({
   id: '/beta',
@@ -52,10 +53,16 @@ const ApiSuggestClipRoute = ApiSuggestClipRouteImport.update({
   path: '/api/suggest-clip',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCutVideoRoute = ApiCutVideoRouteImport.update({
+  id: '/api/cut-video',
+  path: '/api/cut-video',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/beta': typeof BetaRoute
+  '/api/cut-video': typeof ApiCutVideoRoute
   '/api/suggest-clip': typeof ApiSuggestClipRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/translate-en': typeof ApiTranslateEnRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/beta': typeof BetaRoute
+  '/api/cut-video': typeof ApiCutVideoRoute
   '/api/suggest-clip': typeof ApiSuggestClipRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/translate-en': typeof ApiTranslateEnRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/beta': typeof BetaRoute
+  '/api/cut-video': typeof ApiCutVideoRoute
   '/api/suggest-clip': typeof ApiSuggestClipRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/translate-en': typeof ApiTranslateEnRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/beta'
+    | '/api/cut-video'
     | '/api/suggest-clip'
     | '/api/transcribe'
     | '/api/translate-en'
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/beta'
+    | '/api/cut-video'
     | '/api/suggest-clip'
     | '/api/transcribe'
     | '/api/translate-en'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/beta'
+    | '/api/cut-video'
     | '/api/suggest-clip'
     | '/api/transcribe'
     | '/api/translate-en'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BetaRoute: typeof BetaRoute
+  ApiCutVideoRoute: typeof ApiCutVideoRoute
   ApiSuggestClipRoute: typeof ApiSuggestClipRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiTranslateEnRoute: typeof ApiTranslateEnRoute
@@ -172,12 +185,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSuggestClipRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cut-video': {
+      id: '/api/cut-video'
+      path: '/api/cut-video'
+      fullPath: '/api/cut-video'
+      preLoaderRoute: typeof ApiCutVideoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BetaRoute: BetaRoute,
+  ApiCutVideoRoute: ApiCutVideoRoute,
   ApiSuggestClipRoute: ApiSuggestClipRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiTranslateEnRoute: ApiTranslateEnRoute,
