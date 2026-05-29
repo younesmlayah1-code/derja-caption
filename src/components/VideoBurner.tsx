@@ -244,7 +244,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
           <div className="rounded-lg bg-primary/10 px-4 py-3">
             <div className="flex items-center gap-2 text-sm text-primary">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{phase}</span>
+              <span className="truncate">{phase}</span>
               <span className="ml-auto font-mono text-xs">
                 {Math.round(progress * 100)}%
               </span>
@@ -254,6 +254,17 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
                 className="h-full bg-primary transition-[width] duration-200"
                 style={{ width: `${Math.max(2, progress * 100)}%` }}
               />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[11px] font-mono text-primary/80">
+              <span className="inline-flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {fmtTime(elapsed)} elapsed
+              </span>
+              <span>
+                {progress > 0.02
+                  ? `~${fmtTime(Math.max(1, Math.round(elapsed / progress - elapsed)))} left`
+                  : "estimating…"}
+              </span>
             </div>
           </div>
         )}
