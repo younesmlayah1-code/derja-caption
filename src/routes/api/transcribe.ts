@@ -7,12 +7,14 @@ export const Route = createFileRoute("/api/transcribe")({
     handlers: {
       POST: async ({ request }) => {
         const apiKey = process.env.GROQ_API_KEY;
-        if (!apiKey) {
+        const geminiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey && !geminiKey) {
           return Response.json(
-            { error: "GROQ_API_KEY is not configured on the server." },
+            { error: "No transcription provider configured (GROQ_API_KEY or GEMINI_API_KEY)." },
             { status: 500 },
           );
         }
+
 
         let incoming: FormData;
         try {
