@@ -171,6 +171,7 @@ function AdminPanel() {
       plan?: "free" | "pro";
       active?: boolean;
       durationMonths?: number | null;
+      durationDays?: number | null;
     }) => adminUpdateUser({ data: vars }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
   });
@@ -187,6 +188,22 @@ function AdminPanel() {
 
   const grantPlan = (userId: string, months: number | null) => {
     update.mutate({ userId, plan: "pro", active: true, durationMonths: months });
+  };
+
+  const grantCustomDays = (userId: string, email: string) => {
+    const raw = window.prompt(`Grant Pro access to ${email} for how many days? (0 = unlimited)`);
+    if (raw === null) return;
+    const days = Number(raw.trim());
+    if (!Number.isFinite(days) || days < 0 || days > 36500) {
+      alert("Enter a number between 0 and 36500.");
+      return;
+    }
+    update.mutate({
+      userId,
+      plan: "pro",
+      active: true,
+      durationDays: days === 0 ? null : Math.floor(days),
+    });
   };
 
   const handleResetPw = (userId: string, email: string) => {
@@ -304,6 +321,14 @@ function AdminPanel() {
                             No plans configured
                           </span>
                         )}
+                        <button
+                          onClick={() => grantCustomDays(u.id, u.email)}
+                          className="rounded-md border border-dashed border-border bg-background px-2 py-1 text-[11px] hover:border-primary hover:text-primary"
+                          title="Grant Pro for a custom number of days"
+                        >
+                          Custom…
+                        </button>
+
                       </div>
                     </td>
 
