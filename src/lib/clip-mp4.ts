@@ -47,7 +47,11 @@ async function getFFmpeg(): Promise<FFmpeg> {
   return loadPromise;
 }
 
-export type ClipProgress = (info: { stage: "loading" | "cutting" | "done"; pct?: number }) => void;
+export type ClipProgress = (info: {
+  stage: "loading" | "cutting" | "recording" | "done";
+  pct?: number;
+  note?: string;
+}) => void;
 
 async function runCut(
   ff: FFmpeg,
@@ -249,6 +253,112 @@ function errorDetails(error: unknown) {
         : "browser video encoder stopped unexpectedly";
   const tail = recentLogs.slice(-10).join(" | ");
   return tail ? `${message}. ${tail.slice(0, 500)}` : message;
+}
+
+function pickRecorderMime() {
+  if (typeof MediaRecorder === "undefined") return "";
+  return (
+    [
+      "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+      "video/mp4",
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm",
+    ].find((type) => MediaRecorder.isTypeSupported(type)) || ""
+  );
+}
+
+function waitForVideoEvent(video: HTMLVideoElement, event: keyof HTMLMediaElementEventMap) {
+  return new Promise<void>((resolve, reject) => {
+    const onOk = () => cleanup(resolve);
+    const onError = () => cleanup(() => reject(new Error(`Video ${event} failed.`)));
+    const cleanup = (finish: () => void) => {
+      video.removeEventListener(event, onOk);
+      video.removeEventListener("error", onError);
+      finish();
+    };
+    video.addEventListener(event, onOk, { once: true });
+    video.addEventListener("error", onError, { once: true });
+  });
+}
+
+async function recordClipFallback(
+  file: File,
+  startSec: number,
+  endSec: number,
+  onProgress?: ClipProgress,
+): Promise<Blob> {
+  if (typeof document === "undefined" || typeof MediaRecorder === "undefined") {
+    throw new Error("This browser cannot record video clips.");
+  }
+
+  const mimeType = pickRecorderMime();
+  const url = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  const duration = Math.max(0.1, endSec - startSec);
+  let progressTimer = 0;
+
+  video.src = url;
+  video.preload = "auto";
+  video.playsInline = true;
+  video.volume = 0;
+  video.style.cssText =
+    "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
+  document.body.appendChild(video);
+
+  try {
+    await waitForVideoEvent(video, "loadedmetadata");
+    video.currentTime = Math.max(0, Math.min(startSec, Math.max(0, video.duration - 0.1)));
+    await waitForVideoEvent(video, "seeked");
+
+    const stream =
+      (video as HTMLVideoElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream })
+        .captureStream?.() ??
+      (video as HTMLVideoElement & { mozCaptureStream?: () => MediaStream }).mozCaptureStream?.();
+    if (!stream || stream.getTracks().length === 0) {
+      throw new Error("This browser cannot capture the selected video range.");
+    }
+
+    const chunks: BlobPart[] = [];
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    const stopped = new Promise<Blob>((resolve, reject) => {
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      };
+      recorder.onerror = () => reject(new Error("Browser recording failed."));
+      recorder.onstop = () => {
+        const type = recorder.mimeType || mimeType || "video/webm";
+        if (chunks.length === 0) reject(new Error("Browser recording produced an empty clip."));
+        else resolve(new Blob(chunks, { type }));
+      };
+    });
+
+    const stopRecording = () => {
+      if (recorder.state !== "inactive") recorder.stop();
+      video.pause();
+    };
+    video.addEventListener("timeupdate", () => {
+      if (video.currentTime >= endSec) stopRecording();
+    });
+    progressTimer = window.setInterval(() => {
+      const pct = Math.max(0, Math.min(1, (video.currentTime - startSec) / duration));
+      onProgress?.({ stage: "recording", pct, note: "Encoder fallback" });
+    }, 500);
+
+    recorder.start(1000);
+    try {
+      await video.play();
+    } catch {
+      video.muted = true;
+      await video.play();
+    }
+    window.setTimeout(stopRecording, duration * 1000 + 1500);
+    return await stopped;
+  } finally {
+    if (progressTimer) window.clearInterval(progressTimer);
+    video.remove();
+    URL.revokeObjectURL(url);
+  }
 }
 
 export async function cutMp4Clip(
