@@ -15,7 +15,6 @@ import {
   X,
   FlaskConical,
   Home,
-  Crown,
   Infinity as InfinityIcon,
   CheckCircle2,
   CircleSlash,
