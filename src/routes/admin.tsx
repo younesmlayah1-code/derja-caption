@@ -160,6 +160,10 @@ function AdminPanel() {
     queryKey: ["admin-users"],
     queryFn: () => adminListUsers(),
   });
+  const { data: plans = [] } = useQuery({
+    queryKey: ["admin-plans"],
+    queryFn: () => getPlans(),
+  });
 
   const update = useMutation({
     mutationFn: (vars: {
@@ -281,28 +285,28 @@ function AdminPanel() {
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-1">
-                        {[
-                          { label: "1m", months: 1 },
-                          { label: "3m", months: 3 },
-                          { label: "6m", months: 6 },
-                          { label: "12m", months: 12 },
-                          { label: "∞", months: null },
-                        ].map((opt) => (
+                        {plans.map((p, idx) => (
                           <button
-                            key={opt.label}
-                            onClick={() => grantPlan(u.id, opt.months)}
+                            key={`${p.label}-${idx}`}
+                            onClick={() => grantPlan(u.id, p.durationMonths)}
                             className="rounded-md border border-border bg-background px-2 py-1 text-[11px] hover:border-primary hover:text-primary"
                             title={
-                              opt.months === null
-                                ? "Pro + active, no expiry"
-                                : `Pro + active for ${opt.months} month(s)`
+                              p.durationMonths === null || p.durationMonths === 0
+                                ? `${p.label} — Pro + active, no expiry`
+                                : `${p.label} — Pro + active for ${p.durationMonths} month(s)`
                             }
                           >
-                            {opt.label}
+                            {p.label}
                           </button>
                         ))}
+                        {plans.length === 0 && (
+                          <span className="text-[11px] text-muted-foreground">
+                            No plans configured
+                          </span>
+                        )}
                       </div>
                     </td>
+
                     <td className="px-3 py-2 text-right">
                       <div className="flex justify-end gap-1">
                         <button
