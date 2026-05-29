@@ -88,29 +88,17 @@ async function translateChunk(
         "Do not add or remove information. Do not add disclaimers. " +
         'Return JSON only with the same structure: {"items":[{"id":...,"text":"..."}]}';
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": key,
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
+  let content = "";
+  try {
+    content = await geminiChat({
+      system,
+      user: JSON.stringify({ items }),
+      jsonMode: true,
       temperature: 0,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: JSON.stringify({ items }) },
-      ],
-      response_format: { type: "json_object" },
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`AI translate-en failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
+    });
+  } catch (e) {
+    throw new Error(`AI translate-en failed: ${(e as Error).message}`);
   }
-
-  const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = j.choices?.[0]?.message?.content?.trim() ?? "";
   if (!content) return items;
 
   let parsed: unknown;
