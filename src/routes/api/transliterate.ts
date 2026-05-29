@@ -47,7 +47,7 @@ export const Route = createFileRoute("/api/transliterate")({
   },
 });
 
-async function transliterateChunk(items: Item[], key: string): Promise<Item[]> {
+async function transliterateChunk(items: Item[]): Promise<Item[]> {
   const system =
     "أنت خبير في كتابة اللهجة التونسية (الدارجة) بالحروف اللاتينية كما يكتبها التوانسة في الشات (Arabizi / Franco-Arabe). " +
     "حوّل كل نص عربي مكتوب بالحروف العربية إلى نفس الكلام بالحروف اللاتينية بأسلوب تونسي طبيعي. " +
@@ -66,30 +66,12 @@ async function transliterateChunk(items: Item[], key: string): Promise<Item[]> {
     "حافظ على نفس الكلمات والمعنى وعلامات الترقيم. لا تترجم ولا تضيف ولا تحذف شيء. " +
     'أرجع JSON فقط بنفس البنية: {"items":[{"id":...,"text":"..."}]}';
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": key,
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      temperature: 0,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: JSON.stringify({ items }) },
-      ],
-      response_format: { type: "json_object" },
-    }),
+  const content = await geminiChat({
+    system,
+    user: JSON.stringify({ items }),
+    jsonMode: true,
+    temperature: 0,
   });
-
-
-  if (!res.ok) {
-    throw new Error(`AI transliterate failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
-  }
-
-  const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = j.choices?.[0]?.message?.content?.trim() ?? "";
   if (!content) return items;
 
   let parsed: unknown;
