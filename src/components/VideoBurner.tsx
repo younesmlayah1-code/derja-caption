@@ -22,6 +22,7 @@ type Props = {
 };
 
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
+const FAST_RENDER_MAX_WIDTH = 720;
 
 function fmtTime(sec: number): string {
   const s = Math.max(0, Math.floor(sec));
@@ -33,6 +34,13 @@ function fmtTime(sec: number): string {
 function isVideoFile(f: File | null): boolean {
   if (!f) return false;
   return f.type.startsWith("video/") || /\.(mp4|mov|webm|avi|mkv)$/i.test(f.name);
+}
+
+function fitRenderSize(w: number, h: number): { w: number; h: number; fast: boolean } {
+  if (w <= FAST_RENDER_MAX_WIDTH) return { w, h, fast: false };
+  const nextW = FAST_RENDER_MAX_WIDTH;
+  const nextH = Math.max(2, Math.round((h * nextW) / w / 2) * 2);
+  return { w: nextW, h: nextH, fast: true };
 }
 
 export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
@@ -107,19 +115,23 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
     setPhase("Preparing FFmpeg…");
     try {
       const { w, h, duration } = await probeMeta(video);
+      const renderSize = fitRenderSize(w, h);
       const ass = buildAss(segments, {
         style,
         mode,
         script,
-        width: w,
-        height: h,
+        width: renderSize.w,
+        height: renderSize.h,
         fontName,
       });
-      setPhase("Burning captions into video…");
+      setPhase(renderSize.fast ? "Fast render at 720p…" : "Burning captions into video…");
       const blob = await burnSubtitles({
         videoFile: video,
         ass,
+        targetWidth: renderSize.fast ? renderSize.w : undefined,
+        targetHeight: renderSize.fast ? renderSize.h : undefined,
         durationSec: duration || undefined,
+        onPhase: setPhase,
         onProgress: (r) => setProgress(r),
       });
       const url = URL.createObjectURL(blob);
@@ -134,10 +146,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
     }
   };
 
-  const baseName = useMemo(
-    () => (video ? video.name.replace(/\.[^.]+$/, "") : "video"),
-    [video],
-  );
+  const baseName = useMemo(() => (video ? video.name.replace(/\.[^.]+$/, "") : "video"), [video]);
 
   return (
     <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
@@ -252,9 +261,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
             <div className="flex items-center gap-2 text-sm text-primary">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span className="truncate">{phase}</span>
-              <span className="ml-auto font-mono text-xs">
-                {Math.round(progress * 100)}%
-              </span>
+              <span className="ml-auto font-mono text-xs">{Math.round(progress * 100)}%</span>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-background/60">
               <div
@@ -268,7 +275,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
                 {fmtTime(elapsed)} elapsed
               </span>
               <span>
-                {progress > 0.02
+                {progress > 0.11
                   ? `~${fmtTime(Math.max(1, Math.round(elapsed / progress - elapsed)))} left`
                   : "estimating…"}
               </span>
