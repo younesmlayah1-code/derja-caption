@@ -25,8 +25,6 @@ export const Route = createFileRoute("/api/transcribe")({
         if (!(file instanceof File)) {
           return Response.json({ error: "Missing 'file' upload." }, { status: 400 });
         }
-        const languageRaw = incoming.get("language");
-        const language = typeof languageRaw === "string" && languageRaw.length > 0 ? languageRaw : "ar";
 
         const MAX = 25 * 1024 * 1024;
         if (file.size > MAX) {
@@ -47,11 +45,9 @@ export const Route = createFileRoute("/api/transcribe")({
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
         upstream.append("model", "whisper-large-v3");
+        upstream.append("language", "ar");
         upstream.append("response_format", "verbose_json");
-        upstream.append("timestamp_granularities[]", "segment");
-        upstream.append("timestamp_granularities[]", "word");
         upstream.append("temperature", "0");
-        upstream.append("language", language);
         upstream.append("prompt", derjaPrompt);
 
         const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
@@ -71,41 +67,14 @@ export const Route = createFileRoute("/api/transcribe")({
         const data = (await res.json()) as {
           text?: string;
           segments?: Array<{ id?: number; start: number; end: number; text: string }>;
-          words?: Array<{ word?: string; text?: string; start: number; end: number }>;
         };
 
-        const allWords = (data.words ?? []).map((w) => ({
-          start: w.start,
-          end: w.end,
-          text: ((w.word ?? w.text) || "").trim(),
-        })).filter((w) => w.text.length > 0);
-
-        // Assign each word to the segment whose [start,end] contains its
-        // midpoint. Guarantees every word lands in exactly one segment — no
-        // drops on boundaries.
-        const segs = (data.segments ?? []).map((s, i) => ({
+        const rawSegments = (data.segments ?? []).map((s, i) => ({
           id: typeof s.id === "number" ? s.id : i,
           start: s.start,
           end: s.end,
           text: dedupeRepeats((s.text || "").trim()),
-          words: [] as typeof allWords,
         }));
-        for (const w of allWords) {
-          const mid = (w.start + w.end) / 2;
-          let idx = segs.findIndex((s) => mid >= s.start && mid <= s.end);
-          if (idx === -1) {
-            // Fallback: nearest segment by distance to midpoint.
-            let best = 0;
-            let bestDist = Infinity;
-            for (let i = 0; i < segs.length; i++) {
-              const d = Math.min(Math.abs(mid - segs[i].start), Math.abs(mid - segs[i].end));
-              if (d < bestDist) { bestDist = d; best = i; }
-            }
-            idx = best;
-          }
-          if (idx >= 0 && segs[idx]) segs[idx].words.push(w);
-        }
-        const rawSegments = segs;
 
         // Drop segments that became empty after dedupe.
         const segments = rawSegments.filter((s) => s.text.length > 0);
@@ -131,7 +100,7 @@ export const Route = createFileRoute("/api/transcribe")({
           remainingRequests: numOrNull(h.get("x-ratelimit-remaining-requests")),
         };
 
-        return Response.json({ text: fullText, segments: polishedSegments, words: allWords, rate });
+        return Response.json({ text: fullText, segments: polishedSegments, rate });
       },
     },
   },
@@ -145,9 +114,6 @@ function numOrNull(v: string | null): number | null {
 
 type PolishSeg = { id: number; start: number; end: number; text: string };
 
-// Use Lovable AI to fix spelling, spacing and punctuation in Derja segments
-// while preserving the original wording and meaning. Returns same shape with
-// cleaned text. Throws on hard failure; caller falls back to raw segments.
 async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   if (segments.length === 0) return segments;
   const key = await getSecret("LOVABLE_API_KEY");
@@ -191,7 +157,6 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   const content = j.choices?.[0]?.message?.content?.trim() ?? "";
   if (!content) return segments;
 
-  // Model may return either a bare array or an object wrapping it.
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
@@ -222,24 +187,19 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   });
 }
 
-// Collapse only obvious Whisper hallucination loops. We DO NOT touch a single
-// repeat (e.g. "لا لا", "شوية شوية") because those are valid speech. We only
-// act when something repeats 3+ times in a row — that's the real artifact.
 function dedupeRepeats(input: string): string {
   if (!input) return input;
-  // Collapse runs of the same character (6+) down to 2: "اااااااا" -> "اا".
   let s = input.replace(/(.)\1{5,}/g, "$1$1");
 
   const words = s.split(/\s+/).filter(Boolean);
   if (words.length < 3) return s.trim();
 
-  // Collapse a word repeated 3+ times in a row down to a single instance.
   const out: string[] = [];
   let run = 1;
   for (let i = 0; i < words.length; i++) {
     if (i > 0 && words[i] === words[i - 1]) {
       run++;
-      if (run >= 3) continue; // skip 3rd+ repetition
+      if (run >= 3) continue;
       out.push(words[i]);
     } else {
       run = 1;
@@ -247,7 +207,6 @@ function dedupeRepeats(input: string): string {
     }
   }
 
-  // Collapse n-gram phrases repeated 3+ times (n=2..5).
   for (let n = 2; n <= 5; n++) {
     let i = 0;
     while (i + 3 * n <= out.length) {
@@ -255,7 +214,6 @@ function dedupeRepeats(input: string): string {
       const b = out.slice(i + n, i + 2 * n).join(" ");
       const c = out.slice(i + 2 * n, i + 3 * n).join(" ");
       if (a === b && b === c) {
-        // Drop the 3rd copy, keep checking from same position for more.
         out.splice(i + 2 * n, n);
       } else {
         i++;
