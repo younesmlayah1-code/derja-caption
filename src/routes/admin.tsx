@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Shield, LogOut, Trash2, KeyRound, Save, Eraser, Lock } from "lucide-react";
+import { Loader2, Shield, LogOut, Trash2, KeyRound, Save, Eraser, Lock, Tag, Plus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -9,11 +9,14 @@ import {
   adminListSecrets,
   adminListUsers,
   adminResetUserPassword,
+  adminUpdatePlans,
   adminUpdateSecret,
   adminUpdateUser,
   ensureAdminBootstrap,
   getMyAccess,
+  getPlans,
   type ManagedSecretKey,
+  type PlanItem,
 } from "@/lib/auth.functions";
 
 export const Route = createFileRoute("/admin")({
@@ -334,8 +337,129 @@ function AdminPanel() {
         </div>
       )}
 
+      <PlansSection />
       <SecretsSection />
     </main>
+  );
+}
+
+function PlansSection() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-plans"],
+    queryFn: () => getPlans(),
+  });
+  const [draft, setDraft] = useState<PlanItem[] | null>(null);
+  useEffect(() => {
+    if (data && draft === null) setDraft(data);
+  }, [data, draft]);
+
+  const save = useMutation({
+    mutationFn: (plans: PlanItem[]) => adminUpdatePlans({ data: { plans } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-plans"] });
+      qc.invalidateQueries({ queryKey: ["plans"] });
+    },
+  });
+
+  const update = (i: number, patch: Partial<PlanItem>) => {
+    setDraft((d) => d!.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
+  };
+  const remove = (i: number) => setDraft((d) => d!.filter((_, idx) => idx !== i));
+  const add = () =>
+    setDraft((d) => [
+      ...(d ?? []),
+      { label: "New plan", duration: "30 days of access", price: "0 TND", durationMonths: 1 },
+    ]);
+
+  return (
+    <section className="mt-10">
+      <div className="mb-3 flex items-center gap-2">
+        <Tag className="h-5 w-5 text-primary" />
+        <h2 className="text-lg font-semibold">Plans &amp; pricing</h2>
+      </div>
+      <p className="mb-4 text-xs text-muted-foreground">
+        Edit the plans shown on the account page. Duration months controls how long access lasts when granted (use 0 or empty for unlimited).
+      </p>
+
+      {isLoading || !draft ? (
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      ) : (
+        <div className="space-y-3">
+          {draft.map((p, i) => (
+            <div key={i} className="grid gap-2 rounded-2xl border border-border bg-card/40 p-3 sm:grid-cols-12">
+              <input
+                value={p.label}
+                onChange={(e) => update(i, { label: e.target.value })}
+                placeholder="Label"
+                className="sm:col-span-2 rounded-lg border border-border bg-background/80 px-2 py-1.5 text-sm"
+              />
+              <input
+                value={p.duration}
+                onChange={(e) => update(i, { duration: e.target.value })}
+                placeholder="Duration label"
+                className="sm:col-span-3 rounded-lg border border-border bg-background/80 px-2 py-1.5 text-sm"
+              />
+              <input
+                value={p.price}
+                onChange={(e) => update(i, { price: e.target.value })}
+                placeholder="Price (e.g. 15 TND)"
+                className="sm:col-span-2 rounded-lg border border-border bg-background/80 px-2 py-1.5 text-sm"
+              />
+              <input
+                value={p.badge ?? ""}
+                onChange={(e) => update(i, { badge: e.target.value })}
+                placeholder="Badge (optional)"
+                className="sm:col-span-2 rounded-lg border border-border bg-background/80 px-2 py-1.5 text-sm"
+              />
+              <input
+                type="number"
+                min={0}
+                max={120}
+                value={p.durationMonths ?? ""}
+                onChange={(e) =>
+                  update(i, {
+                    durationMonths: e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
+                placeholder="Months (∞)"
+                className="sm:col-span-2 rounded-lg border border-border bg-background/80 px-2 py-1.5 text-sm"
+                title="Months of access. Leave empty or 0 for unlimited."
+              />
+              <button
+                onClick={() => remove(i)}
+                className="sm:col-span-1 inline-flex items-center justify-center rounded-lg border border-border px-2 py-1.5 text-xs text-destructive-foreground hover:bg-accent"
+                title="Remove plan"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={add}
+              className="inline-flex items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs hover:bg-accent"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add plan
+            </button>
+            <button
+              disabled={save.isPending}
+              onClick={() => draft && save.mutate(draft)}
+              className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Save plans
+            </button>
+            {save.isSuccess && <span className="text-xs text-primary">Saved.</span>}
+            {save.isError && (
+              <span className="text-xs text-destructive-foreground">
+                {(save.error as Error).message}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
