@@ -1,5 +1,6 @@
 import type { Segment, Word } from "./subtitles";
 import { extractMonoWavChunks, type AudioChunk } from "./audio";
+import { authedFetch } from "./api-client";
 
 export type LoadProgress = {
   status: string;
