@@ -100,6 +100,18 @@ function LoginPage() {
         >
           {mode === "login" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
         </button>
+        {mode === "login" && (
+          <a
+            href={`https://wa.me/21692799284?text=${encodeURIComponent(
+              `Hi! I forgot my Derja Caption password.\nAccount email: ${email || "(your email)"}\nPlease help me reset it.`,
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center text-xs text-primary hover:underline"
+          >
+            Forgot password? Contact support on WhatsApp
+          </a>
+        )}
         <Link to="/admin" className="block text-center text-[11px] text-muted-foreground/70">
           Admin access
         </Link>

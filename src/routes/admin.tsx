@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Shield, LogOut, Trash2, KeyRound, Save, Eraser } from "lucide-react";
+import { Loader2, Shield, LogOut, Trash2, KeyRound, Save, Eraser, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
   adminDeleteUser,
   adminListSecrets,
   adminListUsers,
+  adminResetUserPassword,
   adminUpdateSecret,
   adminUpdateUser,
   ensureAdminBootstrap,
@@ -172,8 +173,29 @@ function AdminPanel() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
+  const resetPw = useMutation({
+    mutationFn: (vars: { userId: string; password: string }) =>
+      adminResetUserPassword({ data: vars }),
+  });
+
   const grantPlan = (userId: string, months: number | null) => {
     update.mutate({ userId, plan: "pro", active: true, durationMonths: months });
+  };
+
+  const handleResetPw = (userId: string, email: string) => {
+    const pw = window.prompt(`Set a new password for ${email} (min 6 chars):`);
+    if (!pw) return;
+    if (pw.length < 6) {
+      alert("Password must be at least 6 characters.");
+      return;
+    }
+    resetPw.mutate(
+      { userId, password: pw },
+      {
+        onSuccess: () => alert(`Password updated for ${email}.`),
+        onError: (e) => alert((e as Error).message),
+      },
+    );
   };
 
   return (
@@ -279,14 +301,23 @@ function AdminPanel() {
                       </div>
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <button
-                        onClick={() => {
-                          if (confirm(`Delete ${u.email}?`)) del.mutate(u.id);
-                        }}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-destructive-foreground hover:bg-accent"
-                      >
-                        <Trash2 className="h-3 w-3" /> Delete
-                      </button>
+                      <div className="flex justify-end gap-1">
+                        <button
+                          onClick={() => handleResetPw(u.id, u.email)}
+                          className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:border-primary hover:text-primary"
+                          title="Set a new password for this user"
+                        >
+                          <Lock className="h-3 w-3" /> Reset pw
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete ${u.email}?`)) del.mutate(u.id);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-destructive-foreground hover:bg-accent"
+                        >
+                          <Trash2 className="h-3 w-3" /> Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
