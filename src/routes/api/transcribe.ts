@@ -133,13 +133,93 @@ export const Route = createFileRoute("/api/transcribe")({
   },
 });
 
+type PolishWord = { start: number; end: number; text: string };
+type PolishSeg = { id: number; start: number; end: number; text: string; words?: PolishWord[] };
+
 function numOrNull(v: string | null): number | null {
   if (v == null) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-type PolishSeg = { id: number; start: number; end: number; text: string };
+const WORD_EDGE = "[\\s،,.؟!?;:؛()\\[\\]{}\\\"'«»]";
+const LOANWORD_FIXES: Array<[string, string]> = [
+  ["برودوي|برودوا|برودو|produi(?:t)?", "produit"],
+  ["بروجي|بروجاي|projet", "projet"],
+  ["بروبليم|بروبلام|بروبلم|problem(?:e)?", "problème"],
+  ["سارفيس|سيرفيس|service", "service"],
+  ["مونطاج|مونتاج|montage", "montage"],
+  ["بيزناس|بزنس|business", "business"],
+  ["ماركيتينغ|ماركتينج|ماركتينغ|marketing", "marketing"],
+  ["أورديناتور|اورديناتور|ورديناتور|ordinateur", "ordinateur"],
+  ["تيليفون|تليفون|طيليفون|telephone|téléphone", "téléphone"],
+  ["ريزو|reseau|réseau", "réseau"],
+  ["روندي[ -]?فو|رونديفو|rendez[ -]?vous", "rendez-vous"],
+  ["بوتيك|boutique", "boutique"],
+  ["ريستو|ريسطو|resto", "resto"],
+  ["ريستوران|restaurant", "restaurant"],
+  ["كافي|كافيه|cafe|café", "café"],
+  ["فاكتور|facture", "facture"],
+  ["كاميون|camion", "camion"],
+  ["طوموبيل|طوموبيلة|اوتوموبيل|automobile", "automobile"],
+  ["ماشينة|ماكينة|machine", "machine"],
+  ["بانك|بنك|banque", "banque"],
+  ["فاميلا|فاميليا|famille", "famille"],
+  ["إيكول|ايكول|ليكول|école|ecole", "école"],
+  ["بيرو|bureau", "bureau"],
+  ["ميرسي|merci", "merci"],
+  ["سيلفوبلي|سيلفو بلي|s[’']?il vous plai(?:t|s)|s’il vous plaît", "s'il vous plaît"],
+  ["نورمالمون|normalement", "normalement"],
+  ["دييجا|ديجا|deja|déjà", "déjà"],
+  ["توجور|toujours", "toujours"],
+  ["شاريجور|شارجور|chargeur", "chargeur"],
+  ["فيديو|video|vidéo", "vidéo"],
+  ["إيميل|ايميل|email|e-mail", "email"],
+  ["كومبيوتر|كومبيوطر|computer", "computer"],
+  ["وايفاي|wifi|wi-fi", "wifi"],
+  ["داونلود|download", "download"],
+  ["لينك|link", "link"],
+  ["client|كليان|كليون", "client"],
+  ["commande|كوموند|كومند", "commande"],
+  ["livraison|ليفريزون|ليفريزون", "livraison"],
+  ["formation|فورماسيون", "formation"],
+  ["stage|ستاج", "stage"],
+  ["réunion|reunion|ريونيون", "réunion"],
+  ["application|ابليكاسيون|أبليكاسيون", "application"],
+  ["connexion|كونكسيون", "connexion"],
+  ["internet|انترنت|إنترنت", "internet"],
+  ["logiciel|لوجيسيال", "logiciel"],
+  ["facturation|فاكتوراسيون", "facturation"],
+];
+
+function normalizeLoanwords(input: string): string {
+  let out = input;
+  for (const [pattern, replacement] of LOANWORD_FIXES) {
+    out = out.replace(new RegExp(`(^|${WORD_EDGE})(?:${pattern})(?=$|${WORD_EDGE})`, "giu"), `$1${replacement}`);
+  }
+  return out.replace(/\s+([،.؟!,?.])/g, "$1").replace(/\s{2,}/g, " ").trim();
+}
+
+function syncWordsToSegmentText(seg: PolishSeg): PolishSeg {
+  const srcWords = (seg.words ?? []).filter((w) => w.text);
+  const tokens = normalizeLoanwords(seg.text).split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return { ...seg, text: "", words: [] };
+  if (srcWords.length === tokens.length) {
+    return { ...seg, text: tokens.join(" "), words: tokens.map((text, i) => ({ ...srcWords[i], text })) };
+  }
+
+  const duration = Math.max(0.001, seg.end - seg.start);
+  const step = duration / tokens.length;
+  return {
+    ...seg,
+    text: tokens.join(" "),
+    words: tokens.map((text, i) => ({
+      start: seg.start + step * i,
+      end: seg.start + step * (i + 1),
+      text,
+    })),
+  };
+}
 
 // Use Lovable AI to fix spelling, spacing and punctuation in Derja segments
 // while preserving the original wording and meaning. Returns same shape with
