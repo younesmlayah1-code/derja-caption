@@ -18,8 +18,6 @@ import {
 } from "lucide-react";
 import {
   toSrt,
-  toWordSrtFromSegments,
-  segmentToWordCues,
   fmtTime,
   downloadFile,
   type Segment,
