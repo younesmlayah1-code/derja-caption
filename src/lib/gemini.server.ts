@@ -31,7 +31,9 @@ export async function geminiChat(opts: {
     });
 
     if (!res.ok) {
-      throw new Error(`Lovable AI Gateway failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
+      throw new Error(
+        `Lovable AI Gateway failed (${res.status}): ${(await res.text()).slice(0, 300)}`,
+      );
     }
 
     const json = (await res.json()) as {
@@ -44,7 +46,8 @@ export async function geminiChat(opts: {
   if (!key) throw new Error("GEMINI_API_KEY is not configured.");
 
   const model = (opts.model ?? "google/gemini-2.5-flash").replace(/^google\//, "");
-  if (!model.startsWith("gemini-")) throw new Error(`Model ${opts.model} requires LOVABLE_API_KEY.`);
+  if (!model.startsWith("gemini-"))
+    throw new Error(`Model ${opts.model} requires LOVABLE_API_KEY.`);
   const url = `${ENDPOINT}/${model}:generateContent?key=${encodeURIComponent(key)}`;
 
   const body: Record<string, unknown> = {
@@ -70,5 +73,8 @@ export async function geminiChat(opts: {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
   };
   const parts = j.candidates?.[0]?.content?.parts ?? [];
-  return parts.map((p) => p?.text ?? "").join("").trim();
+  return parts
+    .map((p) => p?.text ?? "")
+    .join("")
+    .trim();
 }
