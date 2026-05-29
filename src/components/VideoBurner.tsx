@@ -146,10 +146,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
     }
   };
 
-  const baseName = useMemo(
-    () => (video ? video.name.replace(/\.[^.]+$/, "") : "video"),
-    [video],
-  );
+  const baseName = useMemo(() => (video ? video.name.replace(/\.[^.]+$/, "") : "video"), [video]);
 
   return (
     <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
@@ -264,9 +261,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
             <div className="flex items-center gap-2 text-sm text-primary">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span className="truncate">{phase}</span>
-              <span className="ml-auto font-mono text-xs">
-                {Math.round(progress * 100)}%
-              </span>
+              <span className="ml-auto font-mono text-xs">{Math.round(progress * 100)}%</span>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-background/60">
               <div
