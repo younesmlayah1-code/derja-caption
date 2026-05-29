@@ -5,7 +5,6 @@ import {
   Crown,
   Infinity as InfinityIcon,
   Clock3,
-  LogOut,
   ArrowLeft,
   MessageCircle,
   ShieldCheck,
