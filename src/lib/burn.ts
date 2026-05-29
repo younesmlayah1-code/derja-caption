@@ -296,7 +296,7 @@ export async function burnSubtitles(opts: {
 
   // Progress: the built-in "progress" event is unreliable with filter graphs,
   // so parse "time=HH:MM:SS.cs" from logs as a robust fallback.
-  let lastRatio = 0;
+  let lastRatio = 0.1;
   const report = (r: number) => {
     if (!opts.onProgress) return;
     const v = Math.min(0.99, Math.max(0, r));
