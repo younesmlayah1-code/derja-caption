@@ -11,9 +11,9 @@ export const Route = createFileRoute("/api/translate-en")({
           return Response.json({ error: "LOVABLE_API_KEY is not configured." }, { status: 500 });
         }
 
-        let body: { items?: Item[]; mode?: "line" | "word" };
+        let body: { items?: Item[]; mode?: "line" | "word"; targetLang?: "english" | "french" };
         try {
-          body = (await request.json()) as { items?: Item[]; mode?: "line" | "word" };
+          body = (await request.json()) as typeof body;
         } catch {
           return Response.json({ error: "Invalid JSON." }, { status: 400 });
         }
@@ -24,11 +24,12 @@ export const Route = createFileRoute("/api/translate-en")({
         if (items.length === 0) return Response.json({ items: [] });
 
         const mode = body.mode === "word" ? "word" : "line";
+        const targetLang = body.targetLang === "french" ? "french" : "english";
         const CHUNK = 40;
         const out: Item[] = [];
         for (let i = 0; i < items.length; i += CHUNK) {
           const slice = items.slice(i, i + CHUNK);
-          const translated = await translateChunk(slice, mode, key).catch((e) => {
+          const translated = await translateChunk(slice, mode, targetLang, key).catch((e) => {
             console.error("translate-en chunk failed:", e);
             return slice;
           });
@@ -41,15 +42,21 @@ export const Route = createFileRoute("/api/translate-en")({
   },
 });
 
-async function translateChunk(items: Item[], mode: "line" | "word", key: string): Promise<Item[]> {
+async function translateChunk(
+  items: Item[],
+  mode: "line" | "word",
+  targetLang: "english" | "french",
+  key: string,
+): Promise<Item[]> {
+  const langName = targetLang === "french" ? "French" : "English";
   const system =
     mode === "word"
-      ? "You translate single Tunisian Arabic (Derja) words/tokens into English. " +
-        "For each item return the most natural single-word or short English equivalent. " +
+      ? `You translate single Tunisian Arabic (Derja) words/tokens into ${langName}. ` +
+        `For each item return the most natural single-word or short ${langName} equivalent. ` +
         "Keep proper nouns and code-switched French/English words as-is. " +
         "Do not add explanations. Return JSON only: " +
         '{"items":[{"id":...,"text":"..."}]}'
-      : "You are a professional translator. Translate Tunisian Arabic (Derja) into clear, natural English. " +
+      : `You are a professional translator. Translate Tunisian Arabic (Derja) into clear, natural ${langName}. ` +
         "Preserve meaning, tone and punctuation. Keep proper nouns. Do not add or remove information. " +
         "Return JSON only with the same structure: " +
         '{"items":[{"id":...,"text":"..."}]}';

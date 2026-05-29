@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 type SegIn = { id: number; start: number; end: number; text: string };
+type Range = { start: number; end: number };
 
 export const Route = createFileRoute("/api/suggest-clip")({
   server: {
@@ -11,9 +12,14 @@ export const Route = createFileRoute("/api/suggest-clip")({
           return Response.json({ error: "LOVABLE_API_KEY is not configured." }, { status: 500 });
         }
 
-        let body: { segments?: SegIn[] };
+        let body: {
+          segments?: SegIn[];
+          excludeRanges?: Range[];
+          minSec?: number;
+          maxSec?: number;
+        };
         try {
-          body = (await request.json()) as { segments?: SegIn[] };
+          body = (await request.json()) as typeof body;
         } catch {
           return Response.json({ error: "Invalid JSON." }, { status: 400 });
         }
@@ -23,7 +29,10 @@ export const Route = createFileRoute("/api/suggest-clip")({
           return Response.json({ error: "No segments provided." }, { status: 400 });
         }
 
-        // Trim payload — id, rounded times, text only.
+        const minSec = Math.max(15, Number(body.minSec) || 90);
+        const maxSec = Math.max(minSec + 15, Number(body.maxSec) || 180);
+        const excludeRanges = Array.isArray(body.excludeRanges) ? body.excludeRanges : [];
+
         const compact = segments.map((s) => ({
           id: s.id,
           s: Math.round(s.start * 10) / 10,
@@ -33,12 +42,23 @@ export const Route = createFileRoute("/api/suggest-clip")({
 
         const totalDur = segments[segments.length - 1].end;
 
+        const excludeStr =
+          excludeRanges.length > 0
+            ? ` Avoid overlapping these already-tried ranges (seconds): ${excludeRanges
+                .map((r) => `[${Math.round(r.start)}-${Math.round(r.end)}]`)
+                .join(", ")}. Pick a DIFFERENT moment.`
+            : "";
+
         const system =
           "You are a short-form video editor. Given a transcript with timestamps from a longer video, " +
-          "pick the SINGLE best contiguous clip between 120 and 240 seconds long (2–4 minutes) that would work " +
-          "as a standalone short — a complete thought, hook + payoff, surprising/funny/insightful moment. " +
-          "Snap start and end to segment boundaries. The clip must NOT exceed the video's total duration. " +
-          'Return JSON only: {"start": <seconds>, "end": <seconds>, "title": "<short title>", "reason": "<one sentence why>"}';
+          `pick the SINGLE best contiguous clip between ${minSec} and ${maxSec} seconds long that works ` +
+          "as a standalone short-form video. The clip MUST have: " +
+          "(1) a strong HOOK in the first sentence that grabs attention, " +
+          "(2) a self-contained payoff or insight in the middle, " +
+          "(3) a clean ENDING that feels resolved — not cut off mid-thought. " +
+          "Snap start and end to segment boundaries. Do not exceed total duration." +
+          excludeStr +
+          ' Return JSON only: {"start": <seconds>, "end": <seconds>, "title": "<short title>", "reason": "<one sentence why it works>"}';
 
         const user = JSON.stringify({ totalDurationSec: totalDur, segments: compact });
 
@@ -50,7 +70,7 @@ export const Route = createFileRoute("/api/suggest-clip")({
           },
           body: JSON.stringify({
             model: "google/gemini-3-flash-preview",
-            temperature: 0.3,
+            temperature: excludeRanges.length > 0 ? 0.7 : 0.3,
             messages: [
               { role: "system", content: system },
               { role: "user", content: user },
@@ -84,7 +104,7 @@ export const Route = createFileRoute("/api/suggest-clip")({
         }
 
         const start = clamp(Number(parsed.start ?? 0), 0, totalDur);
-        const end = clamp(Number(parsed.end ?? start + 180), start + 30, totalDur);
+        const end = clamp(Number(parsed.end ?? start + minSec), start + 15, totalDur);
 
         return Response.json({
           start,
@@ -101,3 +121,4 @@ function clamp(n: number, lo: number, hi: number) {
   if (!Number.isFinite(n)) return lo;
   return Math.max(lo, Math.min(hi, n));
 }
+
