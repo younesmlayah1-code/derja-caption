@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Lock, Loader2, LogOut } from "lucide-react";
+import { Lock, Loader2, LogOut, ArrowRight, Clock3 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { getMyAccess } from "@/lib/auth.functions";
 import { supabase } from "@/integrations/supabase/client";
