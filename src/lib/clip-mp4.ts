@@ -397,7 +397,6 @@ export async function cutMp4Clip(
   const progressHandler = ({ progress }: { progress: number }) => {
     onProgress?.({ stage: "cutting", pct: Math.max(0, Math.min(1, progress)) });
   };
-  ff.on("progress", progressHandler);
 
   recentLogs.length = 0;
 
@@ -476,8 +475,7 @@ export async function cutMp4Clip(
       throw new Error(`${errorDetails(e)}. Fallback failed: ${errorDetails(fallbackError)}`);
     }
   } finally {
-    if (!ff) return;
-    ff.off("progress", progressHandler);
+    if (ff) ff.off("progress", progressHandler);
     if (mounted) {
       try {
         await ff.unmount("/input");
