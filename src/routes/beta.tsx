@@ -421,7 +421,7 @@ function BetaApp() {
   const base = file ? file.name.replace(/\.[^.]+$/, "") : "clip";
 
   const finalSegments = (): Segment[] =>
-    clipSegments.map((s) => ({ ...s, text: displayFor(s), words: undefined }));
+    captionSegments.map((s) => ({ ...s, text: displayFor(s), words: undefined }));
 
   const exportSrt = () => {
     const segs = finalSegments();
@@ -816,7 +816,7 @@ function BetaApp() {
         )}
 
         {/* ─── STEP 5: edit transcript ─── */}
-        {clip && clipSegments.length > 0 && (
+        {clip && captionSegments.length > 0 && (
           <Step number={5} title="Review & edit captions">
             {translating ? (
               <div className="flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-6 text-sm text-primary">
@@ -824,8 +824,24 @@ function BetaApp() {
                 Translating to {lang ? LANG_LABELS[lang] : "selected language"}…
               </div>
             ) : (
-              <div className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
-                {clipSegments.map((s) => {
+              <div className="space-y-3">
+                <div className="flex rounded-xl border border-border bg-card/40 p-1">
+                  {(["line", "word"] as CaptionMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setCaptionMode(mode)}
+                      className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium capitalize transition-colors ${
+                        captionMode === mode
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {mode} by {mode}
+                    </button>
+                  ))}
+                </div>
+                <div className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
+                {captionSegments.map((s) => {
                   const txt = displayFor(s);
                   return (
                     <div
@@ -852,13 +868,14 @@ function BetaApp() {
                     </div>
                   );
                 })}
+                </div>
               </div>
             )}
           </Step>
         )}
 
         {/* ─── STEP 6: export ─── */}
-        {clip && clipSegments.length > 0 && (
+        {clip && captionSegments.length > 0 && (
           <Step number={6} title="Download">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <button
@@ -882,9 +899,9 @@ function BetaApp() {
                   {cutting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      {cutting.stage === "loading" && "Loading encoder…"}
+                      {cutting.stage === "loading" && "Preparing…"}
                       {cutting.stage === "cutting" &&
-                        `Cutting${cutting.pct != null ? ` ${Math.round(cutting.pct * 100)}%` : "…"}`}
+                        `Server export${cutting.pct != null ? ` ${Math.round(cutting.pct * 100)}%` : "…"}`}
                       {cutting.stage === "recording" &&
                         `Recording fallback${cutting.pct != null ? ` ${Math.round(cutting.pct * 100)}%` : "…"}`}
                       {cutting.stage === "done" && "Ready"}
