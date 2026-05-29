@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import createFFmpegCore from "@ffmpeg/core";
 
 export const Route = createFileRoute("/api/cut-video")({
   server: {
@@ -73,6 +72,7 @@ async function cutWithServerFFmpeg(
   const g = globalThis as unknown as Record<string, unknown>;
   g.self ??= globalThis;
   g.location ??= { href: requestUrl };
+  const { default: createFFmpegCore } = await import("@ffmpeg/core");
 
   const wasmRes = await fetch(new URL("/ffmpeg/ffmpeg-core.wasm", requestUrl));
   if (!wasmRes.ok) throw new Error(`Could not load server video encoder (${wasmRes.status}).`);
