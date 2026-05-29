@@ -7,7 +7,10 @@ import { z } from "zod";
 function env() {
   const key = process.env.SHOTSTACK_API_KEY;
   if (!key) throw new Error("SHOTSTACK_API_KEY is not configured");
-  const stage = (process.env.SHOTSTACK_ENV || "stage").trim();
+  // Only accept the two valid Shotstack environments. Anything else (full URL,
+  // empty, typo) falls back to "stage".
+  const raw = (process.env.SHOTSTACK_ENV || "").trim().toLowerCase();
+  const stage = raw === "v1" || raw === "stage" ? raw : "stage";
   return { key, stage };
 }
 
