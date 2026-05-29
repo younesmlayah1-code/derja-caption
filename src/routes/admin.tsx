@@ -400,36 +400,32 @@ function AdminPanel() {
                     </td>
 
                     <td className="px-3 py-2">
-                      <div className="flex flex-wrap gap-1">
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (!v) return;
+                          if (v === "__custom__") {
+                            grantCustomDays(u.id, u.email);
+                          } else {
+                            const idx = Number(v);
+                            const p = plans[idx];
+                            if (p) grantPlan(u.id, p.durationMonths);
+                          }
+                          e.target.value = "";
+                        }}
+                        className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                      >
+                        <option value="">Grant…</option>
                         {plans.map((p, idx) => (
-                          <button
-                            key={`${p.label}-${idx}`}
-                            onClick={() => grantPlan(u.id, p.durationMonths)}
-                            className="rounded-md border border-border bg-background px-2 py-1 text-[11px] hover:border-primary hover:text-primary"
-                            title={
-                              p.durationMonths === null || p.durationMonths === 0
-                                ? `${p.label} — Pro + active, no expiry`
-                                : `${p.label} — Pro + active for ${p.durationMonths} month(s)`
-                            }
-                          >
+                          <option key={`${p.label}-${idx}`} value={idx}>
                             {p.label}
-                          </button>
+                          </option>
                         ))}
-                        {plans.length === 0 && (
-                          <span className="text-[11px] text-muted-foreground">
-                            No plans configured
-                          </span>
-                        )}
-                        <button
-                          onClick={() => grantCustomDays(u.id, u.email)}
-                          className="rounded-md border border-dashed border-border bg-background px-2 py-1 text-[11px] hover:border-primary hover:text-primary"
-                          title="Grant Pro for a custom number of days"
-                        >
-                          Custom…
-                        </button>
-
-                      </div>
+                        <option value="__custom__">Custom…</option>
+                      </select>
                     </td>
+
 
                     <td className="px-3 py-2 text-right">
                       <div className="flex justify-end gap-1">
