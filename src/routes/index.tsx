@@ -78,6 +78,28 @@ export const Route = createFileRoute("/")({
 });
 
 function HomeGated() {
+  const { session, loading } = useAuth();
+  const navigate = useNavigate();
+
+  const betaUnlocked =
+    typeof window !== "undefined" && sessionStorage.getItem("beta_unlocked") === "1";
+
+  useEffect(() => {
+    if (!loading && !session && !betaUnlocked) {
+      navigate({ to: "/login" });
+    }
+  }, [loading, session, betaUnlocked, navigate]);
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </main>
+    );
+  }
+
+  if (!session && !betaUnlocked) return null;
+
   return (
     <AccessGate>
       <Home />
