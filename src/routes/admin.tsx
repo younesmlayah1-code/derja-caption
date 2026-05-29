@@ -13,7 +13,6 @@ import {
   Tag,
   Plus,
   X,
-  FlaskConical,
   Home,
   Infinity as InfinityIcon,
   CheckCircle2,
