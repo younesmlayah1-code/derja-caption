@@ -267,20 +267,32 @@ async function ensureFonts(ff: FFmpeg) {
 export async function burnSubtitles(opts: {
   videoFile: File;
   ass: string;
+  targetWidth?: number;
+  targetHeight?: number;
   durationSec?: number;
+  onPhase?: (phase: string) => void;
   onProgress?: (ratio: number) => void;
   onLog?: (msg: string) => void;
 }): Promise<Blob> {
+  opts.onPhase?.("Loading video engine…");
+  opts.onProgress?.(0.01);
   const ff = await loadFFmpeg(opts.onLog);
+  opts.onProgress?.(0.03);
+  opts.onPhase?.("Loading caption fonts…");
   await ensureFonts(ff);
+  opts.onProgress?.(0.05);
 
   const ext = opts.videoFile.name.split(".").pop()?.toLowerCase() || "mp4";
   const inputName = `input.${ext}`;
   const outputName = "output.mp4";
   const subName = "subs.ass";
 
+  opts.onPhase?.("Copying video into browser renderer…");
   await ff.writeFile(inputName, await fetchFile(opts.videoFile));
+  opts.onProgress?.(0.08);
   await ff.writeFile(subName, new TextEncoder().encode(opts.ass));
+  opts.onProgress?.(0.1);
+  opts.onPhase?.("Rendering captions into video…");
 
   // Progress: the built-in "progress" event is unreliable with filter graphs,
   // so parse "time=HH:MM:SS.cs" from logs as a robust fallback.
@@ -299,20 +311,33 @@ export async function burnSubtitles(opts: {
   const logHandler = ({ message }: { message: string }) => {
     if (opts.onLog) opts.onLog(message);
     if (!opts.durationSec) return;
-    const m = message.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/);
-    if (m) {
-      const t = +m[1] * 3600 + +m[2] * 60 + parseFloat(m[3]);
-      report(t / opts.durationSec);
+    const time = message.match(/(?:out_time|time)=(\d+):(\d+):(\d+(?:\.\d+)?)/);
+    if (time) {
+      const t = +time[1] * 3600 + +time[2] * 60 + parseFloat(time[3]);
+      report(0.1 + (t / opts.durationSec) * 0.88);
+      return;
+    }
+    const rawTime = message.match(/out_time_(?:us|ms)=(\d+)/);
+    if (rawTime) {
+      const raw = Number(rawTime[1]);
+      const t = raw > opts.durationSec * 1000 ? raw / 1_000_000 : raw / 1000;
+      report(0.1 + (t / opts.durationSec) * 0.88);
     }
   };
   ff.on("progress", progressHandler);
   ff.on("log", logHandler);
 
   // libass filter; fontsdir lets it find our bundled fonts.
-  const filter = `subtitles=${subName}:fontsdir=/fonts`;
+  const scaleFilter =
+    opts.targetWidth && opts.targetHeight
+      ? `scale=${opts.targetWidth}:${opts.targetHeight}:flags=fast_bilinear,`
+      : "";
+  const filter = `${scaleFilter}subtitles=${subName}:fontsdir=/fonts`;
 
   try {
     await ff.exec([
+      "-progress",
+      "pipe:1",
       "-i",
       inputName,
       "-vf",
@@ -341,12 +366,14 @@ export async function burnSubtitles(opts: {
     ff.off("log", logHandler);
   }
 
-  if (opts.onProgress) opts.onProgress(1);
+  opts.onPhase?.("Finalizing download…");
+  opts.onProgress?.(0.99);
   const data = (await ff.readFile(outputName)) as Uint8Array;
   // Cleanup
   await ff.deleteFile(inputName).catch(() => {});
   await ff.deleteFile(outputName).catch(() => {});
   await ff.deleteFile(subName).catch(() => {});
 
+  if (opts.onProgress) opts.onProgress(1);
   return new Blob([data.buffer as ArrayBuffer], { type: "video/mp4" });
 }
