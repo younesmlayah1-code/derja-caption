@@ -13,7 +13,6 @@ import {
   Pause,
   RefreshCw,
   Languages,
-  Lock,
   CheckCircle2,
 } from "lucide-react";
 import { toSrt, fmtTime, downloadFile, segmentToWordCues, type Segment } from "@/lib/subtitles";
