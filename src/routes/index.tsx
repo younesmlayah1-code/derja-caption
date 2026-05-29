@@ -24,7 +24,7 @@ import {
   type Segment,
 } from "@/lib/subtitles";
 import { transcribeFile, type RateInfo } from "@/lib/transcribe";
-import { VideoBurner } from "@/components/VideoBurner";
+
 
 function splitLongSegments(segs: Segment[]): Segment[] {
   const out: Segment[] = [];
@@ -664,12 +664,6 @@ function Home() {
               ))}
             </div>
 
-            <VideoBurner
-              segments={scriptedSegments()}
-              mode={exportMode}
-              script={script}
-              sourceFile={file}
-            />
           </section>
         )}
 
