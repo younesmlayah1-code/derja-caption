@@ -2,10 +2,8 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const MANAGED_SECRETS = [
   "GROQ_API_KEY",
-  "OPENAI_API_KEY",
   "LOVABLE_API_KEY",
   "RAPIDAPI_KEY",
-  "SHOTSTACK_API_KEY",
 ] as const;
 export type ManagedSecret = (typeof MANAGED_SECRETS)[number];
 
