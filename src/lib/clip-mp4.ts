@@ -156,13 +156,21 @@ export async function cutMp4Clip(
     }
 
     let lastError: unknown = null;
+    let outputBytes: Uint8Array | null = null;
     for (const mode of ["fast-copy", "copy", "reencode"] as const) {
       try {
         try { await ff.deleteFile(outputName); } catch { /* ignore */ }
         const code = await runCut(ff, inputName, outputName, startSec, duration, mode);
         if (code === 0) {
-          lastError = null;
-          break;
+          const data = await ff.readFile(outputName);
+          const bytes = data instanceof Uint8Array ? data : new TextEncoder().encode(String(data));
+          if (bytes.byteLength >= 1024) {
+            outputBytes = bytes;
+            lastError = null;
+            break;
+          }
+          lastError = new Error(`${mode} output too small (${bytes.byteLength}B)`);
+          continue;
         }
         lastError = new Error(`${mode} exited with code ${code}`);
       } catch (e) {
@@ -170,18 +178,13 @@ export async function cutMp4Clip(
         lastError = e;
       }
     }
-    if (lastError) {
+    if (lastError || !outputBytes) {
       throw new Error(errorDetails(lastError));
     }
 
-    const data = await ff.readFile(outputName);
-    const bytes = data instanceof Uint8Array ? data : new TextEncoder().encode(String(data));
-    if (bytes.byteLength < 1024) {
-      throw new Error(errorDetails(`Output too small (${bytes.byteLength}B)`));
-    }
     onProgress?.({ stage: "done", pct: 1 });
-    const buf = new ArrayBuffer(bytes.byteLength);
-    new Uint8Array(buf).set(bytes);
+    const buf = new ArrayBuffer(outputBytes.byteLength);
+    new Uint8Array(buf).set(outputBytes);
     return new Blob([buf], { type: "video/mp4" });
   } catch (e) {
     resetFFmpeg();
