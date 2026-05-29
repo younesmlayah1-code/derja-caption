@@ -171,7 +171,7 @@ export const adminResetUserPassword = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-const MANAGED = ["GROQ_API_KEY", "LOVABLE_API_KEY", "RAPIDAPI_KEY"] as const;
+const MANAGED = ["GROQ_API_KEY", "LOVABLE_API_KEY", "RAPIDAPI_KEY", "GEMINI_API_KEY"] as const;
 type ManagedKey = (typeof MANAGED)[number];
 
 export const adminListSecrets = createServerFn({ method: "GET" })
