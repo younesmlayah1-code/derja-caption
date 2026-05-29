@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as BetaRouteImport } from './routes/beta'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiYoutubeFetchRouteImport } from './routes/api/youtube-fetch'
 import { Route as ApiTransliterateRouteImport } from './routes/api/transliterate'
@@ -18,9 +20,19 @@ import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiSuggestClipRouteImport } from './routes/api/suggest-clip'
 import { Route as ApiCutVideoRouteImport } from './routes/api/cut-video'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BetaRoute = BetaRouteImport.update({
   id: '/beta',
   path: '/beta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -61,7 +73,9 @@ const ApiCutVideoRoute = ApiCutVideoRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/beta': typeof BetaRoute
+  '/login': typeof LoginRoute
   '/api/cut-video': typeof ApiCutVideoRoute
   '/api/suggest-clip': typeof ApiSuggestClipRoute
   '/api/transcribe': typeof ApiTranscribeRoute
@@ -71,7 +85,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/beta': typeof BetaRoute
+  '/login': typeof LoginRoute
   '/api/cut-video': typeof ApiCutVideoRoute
   '/api/suggest-clip': typeof ApiSuggestClipRoute
   '/api/transcribe': typeof ApiTranscribeRoute
@@ -82,7 +98,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/beta': typeof BetaRoute
+  '/login': typeof LoginRoute
   '/api/cut-video': typeof ApiCutVideoRoute
   '/api/suggest-clip': typeof ApiSuggestClipRoute
   '/api/transcribe': typeof ApiTranscribeRoute
@@ -94,7 +112,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/beta'
+    | '/login'
     | '/api/cut-video'
     | '/api/suggest-clip'
     | '/api/transcribe'
@@ -104,7 +124,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/beta'
+    | '/login'
     | '/api/cut-video'
     | '/api/suggest-clip'
     | '/api/transcribe'
@@ -114,7 +136,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/beta'
+    | '/login'
     | '/api/cut-video'
     | '/api/suggest-clip'
     | '/api/transcribe'
@@ -125,7 +149,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   BetaRoute: typeof BetaRoute
+  LoginRoute: typeof LoginRoute
   ApiCutVideoRoute: typeof ApiCutVideoRoute
   ApiSuggestClipRoute: typeof ApiSuggestClipRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
@@ -136,11 +162,25 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/beta': {
       id: '/beta'
       path: '/beta'
       fullPath: '/beta'
       preLoaderRoute: typeof BetaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -197,7 +237,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   BetaRoute: BetaRoute,
+  LoginRoute: LoginRoute,
   ApiCutVideoRoute: ApiCutVideoRoute,
   ApiSuggestClipRoute: ApiSuggestClipRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
@@ -208,3 +250,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
