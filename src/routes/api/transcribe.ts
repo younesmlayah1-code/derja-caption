@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { geminiChat } from "@/lib/gemini.server";
+import { Buffer } from "buffer";
 
 export const Route = createFileRoute("/api/transcribe")({
   server: {
@@ -138,9 +139,9 @@ export const Route = createFileRoute("/api/transcribe")({
           highAccuracyText
             ? referenceSegments
             : await polishSegments(referenceSegments).catch((e: unknown) => {
-            console.error("polishSegments failed:", e);
-            return referenceSegments;
-          })
+                console.error("polishSegments failed:", e);
+                return referenceSegments;
+              })
         ).map(syncWordsToSegmentText);
 
         const fullText =
