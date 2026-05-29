@@ -64,7 +64,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Upload a video or paste a YouTube link, extract Tunisian Arabic (Derja) subtitles with English translation, and let AI pick the best 2–4 min short clip.",
+          "Upload a video and extract Tunisian Arabic (Derja) subtitles with English translation, line- or word-level.",
       },
     ],
   }),
