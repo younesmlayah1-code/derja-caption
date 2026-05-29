@@ -5,10 +5,13 @@ import { z } from "zod";
 // Reads SHOTSTACK_API_KEY (required) and SHOTSTACK_ENV ("stage" | "v1", default "stage").
 
 function env() {
-  const key = process.env.SHOTSTACK_API_KEY;
+  const key = (process.env.SHOTSTACK_API_KEY || "").trim();
   if (!key) throw new Error("SHOTSTACK_API_KEY is not configured");
-  // Only accept the two valid Shotstack environments. Anything else (full URL,
-  // empty, typo) falls back to "stage".
+  if (!/^[A-Za-z0-9]+$/.test(key)) {
+    throw new Error(
+      "SHOTSTACK_API_KEY contains invalid characters. Re-paste the key with no spaces, quotes, or newlines.",
+    );
+  }
   const raw = (process.env.SHOTSTACK_ENV || "").trim().toLowerCase();
   const stage = raw === "v1" || raw === "stage" ? raw : "stage";
   return { key, stage };
