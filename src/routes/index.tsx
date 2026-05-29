@@ -29,6 +29,7 @@ import {
 import { transcribeFile, type RateInfo } from "@/lib/transcribe";
 import { AccessGate } from "@/components/AccessGate";
 import { PlanStatus } from "@/components/PlanStatus";
+import { authedFetch } from "@/lib/api-client";
 
 type Script = "arabic" | "french" | "english";
 
