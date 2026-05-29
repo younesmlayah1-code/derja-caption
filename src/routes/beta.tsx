@@ -16,9 +16,8 @@ import {
   Lock,
   CheckCircle2,
 } from "lucide-react";
-import { toSrt, fmtTime, downloadFile, type Segment } from "@/lib/subtitles";
+import { toSrt, fmtTime, downloadFile, segmentToWordCues, type Segment } from "@/lib/subtitles";
 import { transcribeFile } from "@/lib/transcribe";
-import { cutMp4Clip } from "@/lib/clip-mp4";
 
 export const Route = createFileRoute("/beta")({
   head: () => ({
@@ -89,6 +88,7 @@ function BetaGate() {
 }
 
 type Lang = "derja-ar" | "derja-fr" | "french" | "english";
+type CaptionMode = "line" | "word";
 
 const LANG_LABELS: Record<Lang, string> = {
   "derja-ar": "Derja (Arabic)",
@@ -173,6 +173,7 @@ function BetaApp() {
   const [progressLabel, setProgressLabel] = useState("");
   const [transcript, setTranscript] = useState("");
   const [segments, setSegments] = useState<Segment[]>([]);
+  const [captionMode, setCaptionMode] = useState<CaptionMode>("line");
 
   const runTranscribe = useCallback(async () => {
     if (!file) return;
