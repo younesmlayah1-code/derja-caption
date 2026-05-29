@@ -475,29 +475,31 @@ export async function cutMp4Clip(
       throw new Error(`${errorDetails(e)}. Fallback failed: ${errorDetails(fallbackError)}`);
     }
   } finally {
-    if (ff) ff.off("progress", progressHandler);
-    if (mounted) {
+    if (ff) {
+      ff.off("progress", progressHandler);
+      if (mounted) {
+        try {
+          await ff.unmount("/input");
+        } catch {
+          /* ignore */
+        }
+        try {
+          await ff.deleteDir("/input");
+        } catch {
+          /* ignore */
+        }
+      } else {
+        try {
+          await ff.deleteFile(inputName);
+        } catch {
+          /* ignore */
+        }
+      }
       try {
-        await ff.unmount("/input");
+        await ff.deleteFile(outputName);
       } catch {
         /* ignore */
       }
-      try {
-        await ff.deleteDir("/input");
-      } catch {
-        /* ignore */
-      }
-    } else {
-      try {
-        await ff.deleteFile(inputName);
-      } catch {
-        /* ignore */
-      }
-    }
-    try {
-      await ff.deleteFile(outputName);
-    } catch {
-      /* ignore */
     }
   }
 }
