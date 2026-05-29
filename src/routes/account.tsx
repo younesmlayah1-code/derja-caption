@@ -170,7 +170,7 @@ function AccountPage() {
       </section>
 
       {/* Plans */}
-      <section className="mt-6">
+      <section id="plans" className="mt-6 scroll-mt-6">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">
             {isPro ? "Renew or upgrade" : "Choose a plan"}
@@ -183,26 +183,29 @@ function AccountPage() {
           {PLANS.map((p) => (
             <a
               key={p.label}
-              href={buildWaUrl(p.label)}
+              href={buildWaUrl(p.label, p.price)}
               target="_blank"
               rel="noopener noreferrer"
               className="group relative flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/40 p-4 transition hover:border-primary/60 hover:bg-card/70"
             >
               <div>
-                <div className="font-medium">{p.label}</div>
-                <div className="text-xs text-muted-foreground">{p.duration}</div>
+                <div className="flex items-center gap-2">
+                  <div className="font-medium">{p.label}</div>
+                  {p.badge && (
+                    <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
+                      {p.badge}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{p.duration}</div>
+                <div className="mt-1 text-lg font-bold tracking-tight text-foreground">
+                  {p.price}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {p.badge && (
-                  <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
-                    {p.badge}
-                  </span>
-                )}
-                <span className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
-                  <MessageCircle className="h-3.5 w-3.5" />
-                  WhatsApp
-                </span>
-              </div>
+              <span className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+                <MessageCircle className="h-3.5 w-3.5" />
+                WhatsApp
+              </span>
             </a>
           ))}
         </div>
@@ -210,6 +213,153 @@ function AccountPage() {
           Subscribe button opens WhatsApp +216 92 799 284
         </p>
       </section>
+
+      {/* Personal details */}
+      <ProfileSettings currentEmail={data?.email ?? ""} />
     </main>
+  );
+}
+
+function ProfileSettings({ currentEmail }: { currentEmail: string }) {
+  const [email, setEmail] = useState(currentEmail);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailMsg, setEmailMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const saveEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailMsg(null);
+    if (!email || email === currentEmail) return;
+    setEmailBusy(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ email });
+      if (error) throw error;
+      setEmailMsg({
+        kind: "ok",
+        text: "Check your new email inbox to confirm the change.",
+      });
+    } catch (err) {
+      setEmailMsg({ kind: "err", text: (err as Error).message });
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
+  const savePw = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwMsg(null);
+    if (pw.length < 6) {
+      setPwMsg({ kind: "err", text: "Password must be at least 6 characters." });
+      return;
+    }
+    if (pw !== pw2) {
+      setPwMsg({ kind: "err", text: "Passwords don't match." });
+      return;
+    }
+    setPwBusy(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: pw });
+      if (error) throw error;
+      setPwMsg({ kind: "ok", text: "Password updated." });
+      setPw("");
+      setPw2("");
+    } catch (err) {
+      setPwMsg({ kind: "err", text: (err as Error).message });
+    } finally {
+      setPwBusy(false);
+    }
+  };
+
+  return (
+    <section className="mt-8">
+      <h2 className="mb-3 text-lg font-semibold">Personal details</h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <form
+          onSubmit={saveEmail}
+          className="space-y-3 rounded-2xl border border-border bg-card/40 p-4"
+        >
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Mail className="h-4 w-4 text-primary" /> Change email
+          </div>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-xl border border-border bg-background/80 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <button
+            type="submit"
+            disabled={emailBusy || !email || email === currentEmail}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {emailBusy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            Save email
+          </button>
+          {emailMsg && (
+            <p
+              className={`flex items-start gap-1.5 text-[11px] ${
+                emailMsg.kind === "ok" ? "text-primary" : "text-destructive-foreground"
+              }`}
+            >
+              {emailMsg.kind === "ok" && <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0" />}
+              {emailMsg.text}
+            </p>
+          )}
+        </form>
+
+        <form
+          onSubmit={savePw}
+          className="space-y-3 rounded-2xl border border-border bg-card/40 p-4"
+        >
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <KeyRound className="h-4 w-4 text-primary" /> Change password
+          </div>
+          <input
+            type="password"
+            value={pw}
+            onChange={(e) => setPw(e.target.value)}
+            placeholder="New password"
+            className="w-full rounded-xl border border-border bg-background/80 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <input
+            type="password"
+            value={pw2}
+            onChange={(e) => setPw2(e.target.value)}
+            placeholder="Confirm new password"
+            className="w-full rounded-xl border border-border bg-background/80 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <button
+            type="submit"
+            disabled={pwBusy || !pw}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {pwBusy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            Update password
+          </button>
+          {pwMsg && (
+            <p
+              className={`flex items-start gap-1.5 text-[11px] ${
+                pwMsg.kind === "ok" ? "text-primary" : "text-destructive-foreground"
+              }`}
+            >
+              {pwMsg.kind === "ok" && <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0" />}
+              {pwMsg.text}
+            </p>
+          )}
+        </form>
+      </div>
+    </section>
   );
 }
