@@ -428,7 +428,7 @@ function BetaApp() {
     downloadFile(`${base}-clip.srt`, toSrt(segs), "application/x-subrip;charset=utf-8");
   };
 
-  // Client-side MP4 cut via ffmpeg.wasm
+  // Server-side MP4 cut. Browser ffmpeg/capture is unreliable on mobile.
   const [cutBlob, setCutBlob] = useState<Blob | null>(null);
   const [cutting, setCutting] = useState<CutProgress>(null);
 
@@ -436,12 +436,26 @@ function BetaApp() {
     if (!file || !clip) return;
     setError(null);
     try {
-      setCutting({ stage: "loading" });
-      const blob = await cutMp4Clip(file, clip.start, clip.end, (p) => setCutting(p));
+      setCutting({ stage: "cutting", note: "Server export" });
+      const form = new FormData();
+      form.append("file", file, file.name || "video.mp4");
+      form.append("start", String(clip.start));
+      form.append("end", String(clip.end));
+      const res = await fetch("/api/cut-video", { method: "POST", body: form });
+      if (!res.ok) {
+        let msg = `Server export failed (${res.status}).`;
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
       setCutBlob(blob);
       setCutting({ stage: "done", pct: 1 });
-      const ext = blob.type.includes("webm") ? "webm" : "mp4";
-      downloadBlob(blob, `${base}-clip.${ext}`);
+      downloadBlob(blob, `${base}-clip.mp4`);
     } catch (e) {
       const message =
         e instanceof Error && e.message ? e.message : String(e || "Video export failed.");
@@ -452,8 +466,7 @@ function BetaApp() {
 
   const downloadMp4 = () => {
     if (!cutBlob) return;
-    const ext = cutBlob.type.includes("webm") ? "webm" : "mp4";
-    downloadBlob(cutBlob, `${base}-clip.${ext}`);
+    downloadBlob(cutBlob, `${base}-clip.mp4`);
   };
 
   const downloadFullVideo = () => {
