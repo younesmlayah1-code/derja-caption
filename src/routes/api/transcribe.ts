@@ -36,12 +36,12 @@ export const Route = createFileRoute("/api/transcribe")({
           );
         }
 
-        // Derja-biased prompt: keep Tunisian Arabic as Derja, but preserve
-        // code-switched French/English words in Latin letters instead of
-        // forcing everything into Arabic script.
-        // Derja-biased prompt. Whisper caps prompt at 224 tokens — keep it short.
+        // Derja-biased prompt. Whisper caps prompt at 224 tokens — keep it tight.
         const derjaPrompt =
-          "تفريغ باللهجة التونسية الدارجة كما تُنطق. اكتب العربي بالعربية، والكلمات الفرنسية والإنجليزية بحروفها اللاتينية (montage, business, service, problème, week-end). استعمل الترقيم (،.؟!).";
+          "تفريغ دقيق باللهجة التونسية الدارجة كما تُنطق بالضبط، بدون ترجمة للفصحى. " +
+          "اكتب الكلمات العربية بالحروف العربية، والكلمات الفرنسية والإنجليزية بحروفها اللاتينية بإملائها الصحيح " +
+          "(montage, business, service, problème, week-end, produit, marketing, ordinateur, téléphone). " +
+          "استعمل الترقيم المناسب (،.؟!). لا تكرر الكلمات ولا تخترع كلام غير موجود.";
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
