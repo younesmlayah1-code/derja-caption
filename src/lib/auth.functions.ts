@@ -3,8 +3,9 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const ADMIN_EMAIL = "admin@derja.app";
+const ADMIN_EMAIL = "mlayounes0@gmail.com";
 const ADMIN_PASSWORD = "Youyou2010@1";
+const LEGACY_ADMIN_EMAILS = ["admin@derja.app"];
 
 export const getMyAccess = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
