@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireActiveUser } from "@/lib/access.server";
 
 export const Route = createFileRoute("/api/cut-video")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const gate = await requireActiveUser(request);
+        if (gate instanceof Response) return gate;
         try {
           const form = await request.formData();
           const start = Number(form.get("start"));
