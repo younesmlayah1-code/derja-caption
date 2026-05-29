@@ -41,7 +41,7 @@ export const Route = createFileRoute("/api/translate-en")({
           while (true) {
             const idx = next++;
             if (idx >= chunks.length) return;
-            results[idx] = await translateChunk(chunks[idx], mode, targetLang, key).catch((e) => {
+            results[idx] = await translateChunk(chunks[idx], mode, targetLang, apiKey).catch((e) => {
               console.error("translate-en chunk failed:", e);
               return chunks[idx];
             });
