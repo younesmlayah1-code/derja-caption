@@ -1,7 +1,26 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Shield, LogOut, Trash2, KeyRound, Save, Eraser, Lock, Tag, Plus, X } from "lucide-react";
+import {
+  Loader2,
+  Shield,
+  LogOut,
+  Trash2,
+  KeyRound,
+  Save,
+  Eraser,
+  Lock,
+  Tag,
+  Plus,
+  X,
+  FlaskConical,
+  Home,
+  Infinity as InfinityIcon,
+  CheckCircle2,
+  CircleSlash,
+  CalendarClock,
+  Mail,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -224,18 +243,34 @@ function AdminPanel() {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-8">
-      <header className="mb-6 flex items-center justify-between">
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />
           <h1 className="text-2xl font-semibold">Admin panel</h1>
         </div>
-        <button
-          onClick={() => supabase.auth.signOut()}
-          className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-1.5 text-sm hover:bg-accent"
-        >
-          <LogOut className="h-4 w-4" /> Sign out
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/beta"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-primary/50 bg-primary/10 px-3 py-1.5 text-sm text-primary hover:bg-primary/20"
+            title="Open the beta workspace"
+          >
+            <FlaskConical className="h-4 w-4" /> Beta
+          </Link>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-sm hover:bg-accent"
+          >
+            <Home className="h-4 w-4" /> Home
+          </Link>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-sm hover:bg-accent"
+          >
+            <LogOut className="h-4 w-4" /> Sign out
+          </button>
+        </div>
       </header>
+
 
       {isLoading ? (
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -258,9 +293,24 @@ function AdminPanel() {
                 const days = exp ? Math.ceil((new Date(exp).getTime() - Date.now()) / 86400000) : null;
                 const expired = days !== null && days <= 0;
                 return (
-                  <tr key={u.id} className="border-t border-border align-top">
-                    <td className="px-3 py-2">{u.email}</td>
-                    <td className="px-3 py-2">
+                  <tr key={u.id} className="border-t border-border align-top transition hover:bg-card/30">
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold uppercase text-primary">
+                          {u.email.slice(0, 2)}
+                        </span>
+                        <div className="flex min-w-0 flex-col">
+                          <span className="inline-flex items-center gap-1 truncate text-sm">
+                            <Mail className="h-3 w-3 shrink-0 text-muted-foreground" />
+                            <span className="truncate">{u.email}</span>
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            Joined {new Date(u.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
                       <select
                         value={u.plan}
                         onChange={(e) =>
@@ -269,37 +319,66 @@ function AdminPanel() {
                             plan: e.target.value as "free" | "pro",
                           })
                         }
-                        className="rounded-md border border-border bg-background px-2 py-1"
+                        className={`rounded-md border px-2 py-1 text-xs font-medium ${
+                          u.plan === "pro"
+                            ? "border-primary/50 bg-primary/10 text-primary"
+                            : "border-border bg-background text-muted-foreground"
+                        }`}
                       >
                         <option value="free">free</option>
                         <option value="pro">pro</option>
                       </select>
                     </td>
-                    <td className="px-3 py-2">
-                      <label className="inline-flex cursor-pointer items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={u.active}
-                          onChange={(e) =>
-                            update.mutate({ userId: u.id, active: e.target.checked })
-                          }
-                        />
-                        {u.active ? "active" : "inactive"}
-                      </label>
+                    <td className="px-3 py-3">
+                      <button
+                        type="button"
+                        onClick={() => update.mutate({ userId: u.id, active: !u.active })}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                          u.active
+                            ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                            : "bg-muted text-muted-foreground hover:bg-accent"
+                        }`}
+                        title={u.active ? "Click to deactivate" : "Click to activate"}
+                      >
+                        {u.active ? (
+                          <>
+                            <CheckCircle2 className="h-3 w-3" /> active
+                          </>
+                        ) : (
+                          <>
+                            <CircleSlash className="h-3 w-3" /> inactive
+                          </>
+                        )}
+                      </button>
                     </td>
-                    <td className="px-3 py-2 text-xs">
+                    <td className="px-3 py-3 text-xs">
                       {exp ? (
-                        <span className={expired ? "text-destructive-foreground" : "text-muted-foreground"}>
-                          {new Date(exp).toLocaleDateString()}
-                          <br />
+                        <span
+                          className={`inline-flex flex-col rounded-lg px-2 py-1 ${
+                            expired
+                              ? "bg-destructive/15 text-destructive-foreground"
+                              : days !== null && days <= 7
+                                ? "bg-amber-500/15 text-amber-400"
+                                : "bg-card/60 text-muted-foreground"
+                          }`}
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            <CalendarClock className="h-3 w-3" />
+                            {new Date(exp).toLocaleDateString()}
+                          </span>
                           <span className="text-[10px]">
                             {expired ? "expired" : `${days} day${days === 1 ? "" : "s"} left`}
                           </span>
                         </span>
+                      ) : u.plan === "pro" && u.active ? (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-primary/15 px-2 py-1 text-primary">
+                          <InfinityIcon className="h-3 w-3" /> unlimited
+                        </span>
                       ) : (
-                        <span className="text-muted-foreground">∞ unlimited</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </td>
+
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-1">
                         {plans.map((p, idx) => (
