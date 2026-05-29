@@ -315,12 +315,33 @@ function AdminPanel() {
                     <td className="px-3 py-3">
                       <select
                         value={u.plan}
-                        onChange={(e) =>
-                          update.mutate({
-                            userId: u.id,
-                            plan: e.target.value as "free" | "pro",
-                          })
-                        }
+                        onChange={(e) => {
+                          const plan = e.target.value as "free" | "pro";
+                          if (plan === "free") {
+                            update.mutate({
+                              userId: u.id,
+                              plan: "free",
+                              active: false,
+                              durationDays: null,
+                            });
+                          } else {
+                            const raw = window.prompt(
+                              `Grant Pro to ${u.email} for how many days? (0 = unlimited)`,
+                            );
+                            if (raw === null) return;
+                            const days = Number(raw);
+                            if (!Number.isFinite(days) || days < 0) {
+                              alert("Enter a valid number of days (0 or more).");
+                              return;
+                            }
+                            update.mutate({
+                              userId: u.id,
+                              plan: "pro",
+                              active: true,
+                              durationDays: days === 0 ? null : Math.floor(days),
+                            });
+                          }
+                        }}
                         className={`rounded-md border px-2 py-1 text-xs font-medium ${
                           u.plan === "pro"
                             ? "border-primary/50 bg-primary/10 text-primary"
