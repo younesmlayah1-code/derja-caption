@@ -87,7 +87,7 @@ export const adminUpdateUser = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(supabaseAdmin, context.userId);
-    const patch: Record<string, unknown> = {};
+    const patch: { plan?: "free" | "pro"; active?: boolean } = {};
     if (data.plan !== undefined) patch.plan = data.plan;
     if (data.active !== undefined) patch.active = data.active;
     if (Object.keys(patch).length === 0) return { ok: true };
