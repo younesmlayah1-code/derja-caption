@@ -1,5 +1,6 @@
 import type { Segment, Word } from "./subtitles";
 import { extractMonoWavChunks, type AudioChunk } from "./audio";
+import { authedFetch } from "./api-client";
 
 export type LoadProgress = {
   status: string;
@@ -36,7 +37,7 @@ async function transcribeChunk(chunk: AudioChunk, idx: number, language?: string
   fd.append("file", chunk.blob, `audio_${idx}.wav`);
   if (language) fd.append("language", language);
 
-  const res = await fetch("/api/transcribe", { method: "POST", body: fd });
+  const res = await authedFetch("/api/transcribe", { method: "POST", body: fd });
   if (!res.ok) {
     let msg = `Transcription failed (${res.status}).`;
     try {

@@ -29,6 +29,7 @@ import {
 import { transcribeFile, type RateInfo } from "@/lib/transcribe";
 import { AccessGate } from "@/components/AccessGate";
 import { PlanStatus } from "@/components/PlanStatus";
+import { authedFetch } from "@/lib/api-client";
 
 type Script = "arabic" | "french" | "english";
 
@@ -203,7 +204,7 @@ function Home() {
     setTranslitLoading(true);
     (async () => {
       try {
-        const res = await fetch("/api/transliterate", {
+        const res = await authedFetch("/api/transliterate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ items: missing.map((t, i) => ({ id: i, text: t })) }),
@@ -264,7 +265,7 @@ function Home() {
 
         if (missingLines.length > 0) {
           tasks.push(
-            fetch("/api/translate-en", {
+            authedFetch("/api/translate-en", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -289,7 +290,7 @@ function Home() {
 
         if (missingWords.length > 0) {
           tasks.push(
-            fetch("/api/translate-en", {
+            authedFetch("/api/translate-en", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -434,7 +435,7 @@ function Home() {
     setYtError(null);
     setYtLoading(true);
     try {
-      const res = await fetch("/api/youtube-fetch", {
+      const res = await authedFetch("/api/youtube-fetch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: ytUrl.trim() }),
@@ -449,7 +450,7 @@ function Home() {
 
       // Stream the MP4 through our proxy to avoid CORS, then build a File.
       const proxyUrl = `/api/youtube-fetch?stream=${encodeURIComponent(j.mp4Url)}&name=${encodeURIComponent(j.filename || "youtube.mp4")}`;
-      const blobRes = await fetch(proxyUrl);
+      const blobRes = await authedFetch(proxyUrl);
       if (!blobRes.ok) throw new Error(`Download failed (${blobRes.status}).`);
       const blob = await blobRes.blob();
       const f = new File([blob], j.filename || "youtube.mp4", {
@@ -479,7 +480,7 @@ function Home() {
     setClipError(null);
     setClipLoading(true);
     try {
-      const res = await fetch("/api/suggest-clip", {
+      const res = await authedFetch("/api/suggest-clip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

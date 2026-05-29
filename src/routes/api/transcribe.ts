@@ -1,10 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSecret } from "@/lib/secrets.server";
+import { requireActiveUser } from "@/lib/access.server";
 
 export const Route = createFileRoute("/api/transcribe")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const gate = await requireActiveUser(request);
+        if (gate instanceof Response) return gate;
+
         const apiKey = await getSecret("GROQ_API_KEY");
         if (!apiKey) {
           return Response.json({ error: "GROQ_API_KEY is not configured on the server." }, { status: 500 });

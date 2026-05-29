@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toSrt, fmtTime, downloadFile, segmentToWordCues, type Segment } from "@/lib/subtitles";
 import { transcribeFile } from "@/lib/transcribe";
+import { authedFetch } from "@/lib/api-client";
 import { AccessGate } from "@/components/AccessGate";
 
 export const Route = createFileRoute("/beta")({
@@ -93,7 +94,7 @@ function BetaApp() {
     setError(null);
     setYtLoading(true);
     try {
-      const res = await fetch("/api/youtube-fetch", {
+      const res = await authedFetch("/api/youtube-fetch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: ytUrl.trim() }),
@@ -101,7 +102,7 @@ function BetaApp() {
       const j = (await res.json()) as { mp4Url?: string; filename?: string; error?: string };
       if (!res.ok || !j.mp4Url) throw new Error(j.error || `HTTP ${res.status}`);
       const proxyUrl = `/api/youtube-fetch?stream=${encodeURIComponent(j.mp4Url)}&name=${encodeURIComponent(j.filename || "youtube.mp4")}`;
-      const blobRes = await fetch(proxyUrl);
+      const blobRes = await authedFetch(proxyUrl);
       if (!blobRes.ok) throw new Error(`Download failed (${blobRes.status}).`);
       const blob = await blobRes.blob();
       const f = new File([blob], j.filename || "youtube.mp4", { type: blob.type || "video/mp4" });
@@ -170,7 +171,7 @@ function BetaApp() {
         regenerate && clip ? [...triedRanges, { start: clip.start, end: clip.end }] : [];
       const minSec = Math.max(15, targetDuration - 10);
       const maxSec = targetDuration + 10;
-      const res = await fetch("/api/suggest-clip", {
+      const res = await authedFetch("/api/suggest-clip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -391,7 +392,7 @@ function BetaApp() {
       form.append("file", file, file.name || "video.mp4");
       form.append("start", String(clip.start));
       form.append("end", String(clip.end));
-      const res = await fetch("/api/cut-video", { method: "POST", body: form });
+      const res = await authedFetch("/api/cut-video", { method: "POST", body: form });
       if (!res.ok) {
         let msg = `Server export failed (${res.status}).`;
         try {
