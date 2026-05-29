@@ -177,7 +177,7 @@ function AccountPage() {
           </span>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
-          {PLANS.map((p) => (
+          {plans.map((p) => (
             <a
               key={p.label}
               href={buildWaUrl(p.label, p.price)}
