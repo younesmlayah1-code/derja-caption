@@ -10,12 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiYoutubeFetchRouteImport } from './routes/api/youtube-fetch'
 import { Route as ApiTransliterateRouteImport } from './routes/api/transliterate'
+import { Route as ApiTranslateEnRouteImport } from './routes/api/translate-en'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
+import { Route as ApiSuggestClipRouteImport } from './routes/api/suggest-clip'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiYoutubeFetchRoute = ApiYoutubeFetchRouteImport.update({
+  id: '/api/youtube-fetch',
+  path: '/api/youtube-fetch',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTransliterateRoute = ApiTransliterateRouteImport.update({
@@ -23,40 +31,81 @@ const ApiTransliterateRoute = ApiTransliterateRouteImport.update({
   path: '/api/transliterate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTranslateEnRoute = ApiTranslateEnRouteImport.update({
+  id: '/api/translate-en',
+  path: '/api/translate-en',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   id: '/api/transcribe',
   path: '/api/transcribe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSuggestClipRoute = ApiSuggestClipRouteImport.update({
+  id: '/api/suggest-clip',
+  path: '/api/suggest-clip',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/suggest-clip': typeof ApiSuggestClipRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/translate-en': typeof ApiTranslateEnRoute
   '/api/transliterate': typeof ApiTransliterateRoute
+  '/api/youtube-fetch': typeof ApiYoutubeFetchRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/suggest-clip': typeof ApiSuggestClipRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/translate-en': typeof ApiTranslateEnRoute
   '/api/transliterate': typeof ApiTransliterateRoute
+  '/api/youtube-fetch': typeof ApiYoutubeFetchRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/suggest-clip': typeof ApiSuggestClipRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/translate-en': typeof ApiTranslateEnRoute
   '/api/transliterate': typeof ApiTransliterateRoute
+  '/api/youtube-fetch': typeof ApiYoutubeFetchRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/transcribe' | '/api/transliterate'
+  fullPaths:
+    | '/'
+    | '/api/suggest-clip'
+    | '/api/transcribe'
+    | '/api/translate-en'
+    | '/api/transliterate'
+    | '/api/youtube-fetch'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/transcribe' | '/api/transliterate'
-  id: '__root__' | '/' | '/api/transcribe' | '/api/transliterate'
+  to:
+    | '/'
+    | '/api/suggest-clip'
+    | '/api/transcribe'
+    | '/api/translate-en'
+    | '/api/transliterate'
+    | '/api/youtube-fetch'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/suggest-clip'
+    | '/api/transcribe'
+    | '/api/translate-en'
+    | '/api/transliterate'
+    | '/api/youtube-fetch'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiSuggestClipRoute: typeof ApiSuggestClipRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
+  ApiTranslateEnRoute: typeof ApiTranslateEnRoute
   ApiTransliterateRoute: typeof ApiTransliterateRoute
+  ApiYoutubeFetchRoute: typeof ApiYoutubeFetchRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -68,11 +117,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/youtube-fetch': {
+      id: '/api/youtube-fetch'
+      path: '/api/youtube-fetch'
+      fullPath: '/api/youtube-fetch'
+      preLoaderRoute: typeof ApiYoutubeFetchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/transliterate': {
       id: '/api/transliterate'
       path: '/api/transliterate'
       fullPath: '/api/transliterate'
       preLoaderRoute: typeof ApiTransliterateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/translate-en': {
+      id: '/api/translate-en'
+      path: '/api/translate-en'
+      fullPath: '/api/translate-en'
+      preLoaderRoute: typeof ApiTranslateEnRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/transcribe': {
@@ -82,14 +145,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTranscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/suggest-clip': {
+      id: '/api/suggest-clip'
+      path: '/api/suggest-clip'
+      fullPath: '/api/suggest-clip'
+      preLoaderRoute: typeof ApiSuggestClipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiSuggestClipRoute: ApiSuggestClipRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
+  ApiTranslateEnRoute: ApiTranslateEnRoute,
   ApiTransliterateRoute: ApiTransliterateRoute,
+  ApiYoutubeFetchRoute: ApiYoutubeFetchRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
