@@ -1,4 +1,4 @@
-import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 
 let ffmpegInstance: FFmpeg | null = null;
@@ -130,8 +130,10 @@ export async function cutMp4Clip(
   const ff = await getFFmpeg();
 
   const duration = Math.max(0.1, endSec - startSec);
-  const inputName = "input" + extensionFor(file);
+  const inputFileName = "input" + extensionFor(file);
+  let inputName = `/input/${inputFileName}`;
   const outputName = `clip-${Date.now()}.mp4`;
+  let mounted = false;
 
   const progressHandler = ({ progress }: { progress: number }) => {
     onProgress?.({ stage: "cutting", pct: Math.max(0, Math.min(1, progress)) });
@@ -141,7 +143,17 @@ export async function cutMp4Clip(
   recentLogs.length = 0;
 
   try {
-    await ff.writeFile(inputName, await fetchFile(file));
+    try {
+      await ff.createDir("/input");
+    } catch { /* already exists */ }
+    try {
+      await ff.mount(FFFSType.WORKERFS, { files: [new File([file], inputFileName, { type: file.type })] }, "/input");
+      mounted = true;
+    } catch (mountError) {
+      console.warn("ffmpeg WORKERFS mount failed, copying file instead:", mountError);
+      inputName = inputFileName;
+      await ff.writeFile(inputName, await fetchFile(file));
+    }
 
     let lastError: unknown = null;
     for (const mode of ["fast-copy", "copy", "reencode"] as const) {
@@ -176,7 +188,12 @@ export async function cutMp4Clip(
     throw new Error(errorDetails(e));
   } finally {
     ff.off("progress", progressHandler);
-    try { await ff.deleteFile(inputName); } catch { /* ignore */ }
+    if (mounted) {
+      try { await ff.unmount("/input"); } catch { /* ignore */ }
+      try { await ff.deleteDir("/input"); } catch { /* ignore */ }
+    } else {
+      try { await ff.deleteFile(inputName); } catch { /* ignore */ }
+    }
     try { await ff.deleteFile(outputName); } catch { /* ignore */ }
   }
 }
