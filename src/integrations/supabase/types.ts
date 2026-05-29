@@ -37,6 +37,7 @@ export type Database = {
           active: boolean
           created_at: string
           email: string
+          expires_at: string | null
           id: string
           plan: Database["public"]["Enums"]["plan_tier"]
           updated_at: string
@@ -45,6 +46,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           email: string
+          expires_at?: string | null
           id: string
           plan?: Database["public"]["Enums"]["plan_tier"]
           updated_at?: string
@@ -53,6 +55,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           email?: string
+          expires_at?: string | null
           id?: string
           plan?: Database["public"]["Enums"]["plan_tier"]
           updated_at?: string

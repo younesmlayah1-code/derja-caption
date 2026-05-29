@@ -11,15 +11,23 @@ export const getMyAccess = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const [{ data: profile }, { data: roles }] = await Promise.all([
-      supabase.from("profiles").select("email, plan, active").eq("id", userId).maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("email, plan, active, expires_at")
+        .eq("id", userId)
+        .maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", userId),
     ]);
     const isAdmin = (roles ?? []).some((r) => r.role === "admin");
+    const expiresAt = (profile as { expires_at?: string | null } | null)?.expires_at ?? null;
+    const expired = !!expiresAt && new Date(expiresAt).getTime() <= Date.now();
     return {
       userId,
       email: profile?.email ?? "",
       plan: (profile?.plan as "free" | "pro") ?? "free",
-      active: !!profile?.active,
+      active: !!profile?.active && !expired,
+      expiresAt,
+      expired,
       isAdmin,
     };
   });
@@ -44,7 +52,10 @@ export const ensureAdminBootstrap = createServerFn({ method: "POST" }).handler(a
   // Ensure profile (trigger should have created it, but be safe).
   await supabaseAdmin
     .from("profiles")
-    .upsert({ id: adminUser.id, email: ADMIN_EMAIL, plan: "pro", active: true }, { onConflict: "id" });
+    .upsert(
+      { id: adminUser.id, email: ADMIN_EMAIL, plan: "pro", active: true, expires_at: null },
+      { onConflict: "id" },
+    );
   // Ensure admin role.
   await supabaseAdmin
     .from("user_roles")
@@ -68,7 +79,7 @@ export const adminListUsers = createServerFn({ method: "GET" })
     await assertAdmin(supabaseAdmin, context.userId);
     const { data, error } = await supabaseAdmin
       .from("profiles")
-      .select("id, email, plan, active, created_at")
+      .select("id, email, plan, active, expires_at, created_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return data ?? [];
@@ -82,14 +93,29 @@ export const adminUpdateUser = createServerFn({ method: "POST" })
         userId: z.string().uuid(),
         plan: z.enum(["free", "pro"]).optional(),
         active: z.boolean().optional(),
+        // Duration in months; null = unlimited (no expiry); omit = unchanged.
+        durationMonths: z.number().int().min(0).max(120).nullable().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(supabaseAdmin, context.userId);
-    const patch: { plan?: "free" | "pro"; active?: boolean } = {};
+    const patch: {
+      plan?: "free" | "pro";
+      active?: boolean;
+      expires_at?: string | null;
+    } = {};
     if (data.plan !== undefined) patch.plan = data.plan;
     if (data.active !== undefined) patch.active = data.active;
+    if (data.durationMonths !== undefined) {
+      if (data.durationMonths === null || data.durationMonths === 0) {
+        patch.expires_at = null; // unlimited
+      } else {
+        const d = new Date();
+        d.setMonth(d.getMonth() + data.durationMonths);
+        patch.expires_at = d.toISOString();
+      }
+    }
     if (Object.keys(patch).length === 0) return { ok: true };
     const { error } = await supabaseAdmin.from("profiles").update(patch).eq("id", data.userId);
     if (error) throw new Error(error.message);

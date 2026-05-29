@@ -158,8 +158,12 @@ function AdminPanel() {
   });
 
   const update = useMutation({
-    mutationFn: (vars: { userId: string; plan?: "free" | "pro"; active?: boolean }) =>
-      adminUpdateUser({ data: vars }),
+    mutationFn: (vars: {
+      userId: string;
+      plan?: "free" | "pro";
+      active?: boolean;
+      durationMonths?: number | null;
+    }) => adminUpdateUser({ data: vars }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
@@ -168,8 +172,12 @@ function AdminPanel() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
+  const grantPlan = (userId: string, months: number | null) => {
+    update.mutate({ userId, plan: "pro", active: true, durationMonths: months });
+  };
+
   return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-4 py-8">
+    <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-8">
       <header className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />
@@ -193,59 +201,99 @@ function AdminPanel() {
                 <th className="px-3 py-2">Email</th>
                 <th className="px-3 py-2">Plan</th>
                 <th className="px-3 py-2">Active</th>
-                <th className="px-3 py-2">Joined</th>
+                <th className="px-3 py-2">Expires</th>
+                <th className="px-3 py-2">Grant access</th>
                 <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-t border-border">
-                  <td className="px-3 py-2">{u.email}</td>
-                  <td className="px-3 py-2">
-                    <select
-                      value={u.plan}
-                      onChange={(e) =>
-                        update.mutate({
-                          userId: u.id,
-                          plan: e.target.value as "free" | "pro",
-                        })
-                      }
-                      className="rounded-md border border-border bg-background px-2 py-1"
-                    >
-                      <option value="free">free</option>
-                      <option value="pro">pro</option>
-                    </select>
-                  </td>
-                  <td className="px-3 py-2">
-                    <label className="inline-flex cursor-pointer items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={u.active}
+              {users.map((u) => {
+                const exp = (u as { expires_at?: string | null }).expires_at ?? null;
+                const days = exp ? Math.ceil((new Date(exp).getTime() - Date.now()) / 86400000) : null;
+                const expired = days !== null && days <= 0;
+                return (
+                  <tr key={u.id} className="border-t border-border align-top">
+                    <td className="px-3 py-2">{u.email}</td>
+                    <td className="px-3 py-2">
+                      <select
+                        value={u.plan}
                         onChange={(e) =>
-                          update.mutate({ userId: u.id, active: e.target.checked })
+                          update.mutate({
+                            userId: u.id,
+                            plan: e.target.value as "free" | "pro",
+                          })
                         }
-                      />
-                      {u.active ? "active" : "inactive"}
-                    </label>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
-                    {new Date(u.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      onClick={() => {
-                        if (confirm(`Delete ${u.email}?`)) del.mutate(u.id);
-                      }}
-                      className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-destructive-foreground hover:bg-accent"
-                    >
-                      <Trash2 className="h-3 w-3" /> Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                        className="rounded-md border border-border bg-background px-2 py-1"
+                      >
+                        <option value="free">free</option>
+                        <option value="pro">pro</option>
+                      </select>
+                    </td>
+                    <td className="px-3 py-2">
+                      <label className="inline-flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={u.active}
+                          onChange={(e) =>
+                            update.mutate({ userId: u.id, active: e.target.checked })
+                          }
+                        />
+                        {u.active ? "active" : "inactive"}
+                      </label>
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {exp ? (
+                        <span className={expired ? "text-destructive-foreground" : "text-muted-foreground"}>
+                          {new Date(exp).toLocaleDateString()}
+                          <br />
+                          <span className="text-[10px]">
+                            {expired ? "expired" : `${days} day${days === 1 ? "" : "s"} left`}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">∞ unlimited</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap gap-1">
+                        {[
+                          { label: "1m", months: 1 },
+                          { label: "3m", months: 3 },
+                          { label: "6m", months: 6 },
+                          { label: "12m", months: 12 },
+                          { label: "∞", months: null },
+                        ].map((opt) => (
+                          <button
+                            key={opt.label}
+                            onClick={() => grantPlan(u.id, opt.months)}
+                            className="rounded-md border border-border bg-background px-2 py-1 text-[11px] hover:border-primary hover:text-primary"
+                            title={
+                              opt.months === null
+                                ? "Pro + active, no expiry"
+                                : `Pro + active for ${opt.months} month(s)`
+                            }
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        onClick={() => {
+                          if (confirm(`Delete ${u.email}?`)) del.mutate(u.id);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-destructive-foreground hover:bg-accent"
+                      >
+                        <Trash2 className="h-3 w-3" /> Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
                     No users yet.
                   </td>
                 </tr>
