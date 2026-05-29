@@ -536,9 +536,10 @@ function Home() {
   return (
     <main className="min-h-screen w-full px-4 py-10 md:py-16">
       <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-6 flex justify-end">
-          <PlanStatus />
-        </div>
+      <div className="mb-6 flex items-start justify-between gap-2">
+        <PlanStatus />
+        <SignOutButton />
+      </div>
         <header className="mb-10 text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-card/40 px-3 py-1 text-xs text-muted-foreground backdrop-blur">
             <Languages className="h-3.5 w-3.5 text-primary" />
