@@ -125,7 +125,7 @@ export const Route = createFileRoute("/api/transcribe")({
         // Drop segments that became empty after dedupe.
         const segments = rawSegments.filter((s) => s.text.length > 0);
 
-        const referenceSegments = highAccuracyText
+        const referenceSegments: PolishSeg[] = highAccuracyText
           ? await alignSegmentsToReference(segments, highAccuracyText).catch((e: unknown) => {
               console.error("alignSegmentsToReference failed, using weighted split:", e);
               return splitReferenceBySegmentWeights(segments, highAccuracyText);
@@ -135,7 +135,7 @@ export const Route = createFileRoute("/api/transcribe")({
         // Polish spelling, spacing, and punctuation with the configured AI while
         // preserving the original Derja words and meaning. Failures here are
         // non-fatal — we fall back to the raw Whisper output.
-        const polishedSegments = (
+        const polishedSegments: PolishSeg[] = (
           highAccuracyText
             ? referenceSegments
             : await polishSegments(referenceSegments).catch((e: unknown) => {
@@ -160,7 +160,7 @@ export const Route = createFileRoute("/api/transcribe")({
           remainingRequests: numOrNull(h.get("x-ratelimit-remaining-requests")),
         };
 
-        const polishedWords = polishedSegments.flatMap((s) => s.words ?? []);
+        const polishedWords = polishedSegments.flatMap((s: PolishSeg) => s.words ?? []);
 
         return Response.json({
           text: fullText,
