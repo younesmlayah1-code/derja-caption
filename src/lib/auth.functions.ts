@@ -222,3 +222,65 @@ function mask(v: string): string {
 }
 
 export type ManagedSecretKey = ManagedKey;
+
+// ---------------- Plans (pricing) management ----------------
+
+const PLANS_KEY = "plans";
+
+export type PlanItem = {
+  label: string;
+  duration: string;
+  price: string;
+  badge?: string;
+  durationMonths: number | null; // null = unlimited
+};
+
+const DEFAULT_PLANS: PlanItem[] = [
+  { label: "1 Month", duration: "30 days of access", price: "15 TND", durationMonths: 1 },
+  { label: "3 Months", duration: "90 days of access", price: "40 TND", badge: "Popular", durationMonths: 3 },
+  { label: "6 Months", duration: "180 days of access", price: "70 TND", durationMonths: 6 },
+  { label: "12 Months", duration: "365 days of access", price: "120 TND", badge: "Best value", durationMonths: 12 },
+  { label: "Unlimited", duration: "Lifetime access", price: "250 TND", durationMonths: null },
+];
+
+const planSchema = z.object({
+  label: z.string().min(1).max(60),
+  duration: z.string().min(1).max(80),
+  price: z.string().min(1).max(40),
+  badge: z.string().max(40).optional().or(z.literal("")),
+  durationMonths: z.number().int().min(0).max(120).nullable(),
+});
+
+export const getPlans = createServerFn({ method: "GET" }).handler(async () => {
+  const { data } = await supabaseAdmin
+    .from("app_settings")
+    .select("value")
+    .eq("key", PLANS_KEY)
+    .maybeSingle();
+  if (!data?.value) return DEFAULT_PLANS;
+  try {
+    const parsed = JSON.parse(data.value);
+    const arr = z.array(planSchema).parse(parsed);
+    return arr.map((p) => ({ ...p, badge: p.badge || undefined })) as PlanItem[];
+  } catch {
+    return DEFAULT_PLANS;
+  }
+});
+
+export const adminUpdatePlans = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ plans: z.array(planSchema).min(1).max(20) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(supabaseAdmin, context.userId);
+    const cleaned = data.plans.map((p) => ({
+      ...p,
+      badge: p.badge?.trim() ? p.badge.trim() : undefined,
+    }));
+    const { error } = await supabaseAdmin
+      .from("app_settings")
+      .upsert({ key: PLANS_KEY, value: JSON.stringify(cleaned) }, { onConflict: "key" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
