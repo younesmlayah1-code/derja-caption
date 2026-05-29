@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Upload,
   FileVideo,
