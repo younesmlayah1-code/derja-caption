@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toSrt, fmtTime, downloadFile, segmentToWordCues, type Segment } from "@/lib/subtitles";
 import { transcribeFile } from "@/lib/transcribe";
+import { AccessGate } from "@/components/AccessGate";
 
 export const Route = createFileRoute("/beta")({
   head: () => ({
@@ -29,61 +30,11 @@ export const Route = createFileRoute("/beta")({
   component: BetaGate,
 });
 
-const BETA_PASSWORD = "youyou2010";
-const BETA_KEY = "beta-auth-v1";
-
 function BetaGate() {
-  const [authed, setAuthed] = useState(false);
-  const [pw, setPw] = useState("");
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && sessionStorage.getItem(BETA_KEY) === "1") {
-      setAuthed(true);
-    }
-  }, []);
-
-  if (authed) return <BetaApp />;
-
   return (
-    <main className="flex min-h-screen w-full items-center justify-center px-4">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (pw === BETA_PASSWORD) {
-            sessionStorage.setItem(BETA_KEY, "1");
-            setAuthed(true);
-          } else {
-            setErr("Wrong password.");
-          }
-        }}
-        className="w-full max-w-sm space-y-4 rounded-3xl border border-border bg-card/40 p-6 backdrop-blur"
-      >
-        <div className="flex items-center gap-2">
-          <Lock className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-semibold">Beta access</h1>
-        </div>
-        <p className="text-sm text-muted-foreground">Enter the password to continue.</p>
-        <input
-          type="password"
-          autoFocus
-          value={pw}
-          onChange={(e) => {
-            setPw(e.target.value);
-            setErr(null);
-          }}
-          placeholder="Password"
-          className="w-full rounded-xl border border-border bg-background/80 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-        />
-        {err && <p className="text-xs text-destructive-foreground">{err}</p>}
-        <button
-          type="submit"
-          className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Unlock
-        </button>
-      </form>
-    </main>
+    <AccessGate>
+      <BetaApp />
+    </AccessGate>
   );
 }
 
