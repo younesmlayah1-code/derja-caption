@@ -61,9 +61,11 @@ async function runCut(
   const t = duration.toFixed(3);
   const commonMaps = ["-map", "0:v:0?", "-map", "0:a:0?", "-sn", "-dn"];
   const safeScale = "scale=trunc(iw/2)*2:trunc(ih/2)*2";
-  const args =
-    mode === "fast-copy"
-      ? [
+  let args: string[];
+
+  switch (mode) {
+    case "fast-copy":
+      args = [
           "-hide_banner",
           "-ss",
           ss,
@@ -78,10 +80,13 @@ async function runCut(
           "make_zero",
           "-movflags",
           "+faststart",
+          "-f",
+          "mp4",
           outputName,
-        ]
-      : mode === "copy"
-        ? [
+        ];
+      break;
+    case "copy":
+      args = [
             "-hide_banner",
             "-i",
             inputName,
@@ -96,10 +101,13 @@ async function runCut(
             "make_zero",
             "-movflags",
             "+faststart",
+            "-f",
+            "mp4",
             outputName,
-          ]
-        : mode === "remux-audio"
-          ? [
+          ];
+      break;
+    case "remux-audio":
+      args = [
               "-hide_banner",
               "-ss",
               ss,
@@ -119,9 +127,10 @@ async function runCut(
               "-f",
               "mp4",
               outputName,
-            ]
-          : mode === "h264-aac"
-            ? [
+            ];
+      break;
+    case "h264-aac":
+      args = [
                 "-hide_banner",
                 "-ss",
                 ss,
@@ -155,9 +164,10 @@ async function runCut(
                 "-f",
                 "mp4",
                 outputName,
-              ]
-            : mode === "native-mp4"
-              ? [
+              ];
+      break;
+    case "native-mp4":
+      args = [
                   "-hide_banner",
                   "-ss",
                   ss,
@@ -183,9 +193,10 @@ async function runCut(
                   "-f",
                   "mp4",
                   outputName,
-                ]
-              : mode === "video-only"
-                ? [
+                ];
+      break;
+    case "video-only":
+      args = [
                     "-hide_banner",
                     "-ss",
                     ss,
@@ -211,42 +222,9 @@ async function runCut(
                     "-f",
                     "mp4",
                     outputName,
-                  ]
-        : [
-            "-hide_banner",
-            "-ss",
-            ss,
-            "-i",
-            inputName,
-            "-t",
-            t,
-            ...commonMaps,
-            "-vf",
-            safeScale,
-            "-c:v",
-            "libx264",
-            "-preset",
-            "ultrafast",
-            "-crf",
-            "28",
-            "-profile:v",
-            "baseline",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "128k",
-            "-ar",
-            "44100",
-            "-ac",
-            "2",
-            "-movflags",
-            "+faststart",
-            "-f",
-            "mp4",
-            outputName,
-          ];
+                  ];
+      break;
+  }
   return ff.exec(args);
 }
 
