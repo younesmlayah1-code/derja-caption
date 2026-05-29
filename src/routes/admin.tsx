@@ -1,7 +1,27 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Shield, LogOut, Trash2, KeyRound, Save, Eraser, Lock, Tag, Plus, X } from "lucide-react";
+import {
+  Loader2,
+  Shield,
+  LogOut,
+  Trash2,
+  KeyRound,
+  Save,
+  Eraser,
+  Lock,
+  Tag,
+  Plus,
+  X,
+  FlaskConical,
+  Home,
+  Crown,
+  Infinity as InfinityIcon,
+  CheckCircle2,
+  CircleSlash,
+  CalendarClock,
+  Mail,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
