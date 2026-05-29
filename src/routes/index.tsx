@@ -767,56 +767,6 @@ function Home() {
               )}
             </div>
 
-            {/* AI clip suggestion */}
-            <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  AI-picked short clip (2–4 min)
-                </h3>
-                <button
-                  onClick={suggestClip}
-                  disabled={clipLoading}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {clipLoading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Scissors className="h-3.5 w-3.5" />
-                  )}
-                  {clip ? "Re-pick" : "Suggest best clip"}
-                </button>
-              </div>
-              {clipError && (
-                <p className="mb-2 text-xs text-destructive-foreground">{clipError}</p>
-              )}
-              {clip ? (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-baseline gap-3">
-                    <span className="rounded-md bg-primary/15 px-2 py-1 font-mono text-xs text-primary">
-                      {fmtTime(clip.start)} → {fmtTime(clip.end)}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {Math.round(clip.end - clip.start)}s · {clip.title}
-                    </span>
-                  </div>
-                  {clip.reason && (
-                    <p className="text-sm text-muted-foreground">{clip.reason}</p>
-                  )}
-                  <button
-                    onClick={exportClipSrt}
-                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-xs hover:border-primary/50 hover:bg-primary/10"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Download clip SRT
-                  </button>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground/70">
-                  Lovable AI scans your transcript and picks the most engaging 2–4 minute segment.
-                </p>
-              )}
-            </div>
 
             <div className="rounded-2xl border border-border bg-card/40 p-5 backdrop-blur">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
