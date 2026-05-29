@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/transliterate")({
         const out: Item[] = [];
         for (let i = 0; i < items.length; i += CHUNK) {
           const slice = items.slice(i, i + CHUNK);
-          const translit = await transliterateChunk(slice, key).catch((e) => {
+          const translit = await transliterateChunk(slice).catch((e) => {
             console.error("transliterate chunk failed:", e);
             return slice; // fallback: original text
           });
