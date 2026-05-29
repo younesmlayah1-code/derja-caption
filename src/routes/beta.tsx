@@ -16,9 +16,8 @@ import {
   Lock,
   CheckCircle2,
 } from "lucide-react";
-import { toSrt, fmtTime, downloadFile, type Segment } from "@/lib/subtitles";
+import { toSrt, fmtTime, downloadFile, segmentToWordCues, type Segment } from "@/lib/subtitles";
 import { transcribeFile } from "@/lib/transcribe";
-import { cutMp4Clip } from "@/lib/clip-mp4";
 
 export const Route = createFileRoute("/beta")({
   head: () => ({
@@ -89,6 +88,7 @@ function BetaGate() {
 }
 
 type Lang = "derja-ar" | "derja-fr" | "french" | "english";
+type CaptionMode = "line" | "word";
 
 const LANG_LABELS: Record<Lang, string> = {
   "derja-ar": "Derja (Arabic)",
@@ -173,6 +173,7 @@ function BetaApp() {
   const [progressLabel, setProgressLabel] = useState("");
   const [transcript, setTranscript] = useState("");
   const [segments, setSegments] = useState<Segment[]>([]);
+  const [captionMode, setCaptionMode] = useState<CaptionMode>("line");
 
   const runTranscribe = useCallback(async () => {
     if (!file) return;
@@ -317,6 +318,19 @@ function BetaApp() {
       }));
   }, [segments, clip]);
 
+  const captionSegments = useMemo<Segment[]>(() => {
+    if (captionMode === "line") return clipSegments;
+    let id = 0;
+    return clipSegments.flatMap((s) =>
+      segmentToWordCues(s).map((w) => ({
+        id: ++id,
+        start: w.start,
+        end: w.end,
+        text: w.text,
+      })),
+    );
+  }, [clipSegments, captionMode]);
+
   // ------- Translation maps (clip-scoped) -------
   const [englishMap, setEnglishMap] = useState<Map<string, string>>(new Map());
   const [frenchMap, setFrenchMap] = useState<Map<string, string>>(new Map()); // french translation
@@ -324,10 +338,10 @@ function BetaApp() {
   const [translating, setTranslating] = useState(false);
 
   useEffect(() => {
-    if (!lang || !clip || clipSegments.length === 0) return;
+    if (!lang || !clip || captionSegments.length === 0) return;
     if (lang === "derja-ar") return;
 
-    const texts = clipSegments.map((s) => s.text).filter(Boolean);
+    const texts = captionSegments.map((s) => s.text).filter(Boolean);
     let url = "";
     let body: Record<string, unknown> = {};
     let target: Map<string, string>;
@@ -337,12 +351,12 @@ function BetaApp() {
       target = englishMap;
       setTarget = setEnglishMap;
       url = "/api/translate-en";
-      body = { mode: "line", targetLang: "english" };
+      body = { mode: captionMode, targetLang: "english" };
     } else if (lang === "french") {
       target = frenchMap;
       setTarget = setFrenchMap;
       url = "/api/translate-en";
-      body = { mode: "line", targetLang: "french" };
+      body = { mode: captionMode, targetLang: "french" };
     } else {
       target = frenchDerjaMap;
       setTarget = setFrenchDerjaMap;
@@ -379,7 +393,7 @@ function BetaApp() {
     return () => {
       cancelled = true;
     };
-  }, [lang, clipSegments, clip, englishMap, frenchMap, frenchDerjaMap]);
+  }, [lang, captionSegments, captionMode, clip, englishMap, frenchMap, frenchDerjaMap]);
 
   const baseTextFor = (s: Segment): string => {
     if (!lang || lang === "derja-ar") return s.text;
@@ -392,12 +406,12 @@ function BetaApp() {
   // Override key = `${lang}:${id}` so edits per language stay separate.
   const [overrides, setOverrides] = useState<Map<string, string>>(new Map());
   const displayFor = (s: Segment): string =>
-    overrides.get(`${lang ?? "derja-ar"}:${s.id}`) ?? baseTextFor(s);
+    overrides.get(`${captionMode}:${lang ?? "derja-ar"}:${s.id}`) ?? baseTextFor(s);
 
   const updateSegment = (id: number, value: string) => {
     setOverrides((prev) => {
       const next = new Map(prev);
-      next.set(`${lang ?? "derja-ar"}:${id}`, value);
+      next.set(`${captionMode}:${lang ?? "derja-ar"}:${id}`, value);
       return next;
     });
   };
@@ -407,14 +421,14 @@ function BetaApp() {
   const base = file ? file.name.replace(/\.[^.]+$/, "") : "clip";
 
   const finalSegments = (): Segment[] =>
-    clipSegments.map((s) => ({ ...s, text: displayFor(s), words: undefined }));
+    captionSegments.map((s) => ({ ...s, text: displayFor(s), words: undefined }));
 
   const exportSrt = () => {
     const segs = finalSegments();
     downloadFile(`${base}-clip.srt`, toSrt(segs), "application/x-subrip;charset=utf-8");
   };
 
-  // Client-side MP4 cut via ffmpeg.wasm
+  // Server-side MP4 cut. Browser ffmpeg/capture is unreliable on mobile.
   const [cutBlob, setCutBlob] = useState<Blob | null>(null);
   const [cutting, setCutting] = useState<CutProgress>(null);
 
@@ -422,12 +436,26 @@ function BetaApp() {
     if (!file || !clip) return;
     setError(null);
     try {
-      setCutting({ stage: "loading" });
-      const blob = await cutMp4Clip(file, clip.start, clip.end, (p) => setCutting(p));
+      setCutting({ stage: "cutting", note: "Server export" });
+      const form = new FormData();
+      form.append("file", file, file.name || "video.mp4");
+      form.append("start", String(clip.start));
+      form.append("end", String(clip.end));
+      const res = await fetch("/api/cut-video", { method: "POST", body: form });
+      if (!res.ok) {
+        let msg = `Server export failed (${res.status}).`;
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
       setCutBlob(blob);
       setCutting({ stage: "done", pct: 1 });
-      const ext = blob.type.includes("webm") ? "webm" : "mp4";
-      downloadBlob(blob, `${base}-clip.${ext}`);
+      downloadBlob(blob, `${base}-clip.mp4`);
     } catch (e) {
       const message =
         e instanceof Error && e.message ? e.message : String(e || "Video export failed.");
@@ -438,8 +466,7 @@ function BetaApp() {
 
   const downloadMp4 = () => {
     if (!cutBlob) return;
-    const ext = cutBlob.type.includes("webm") ? "webm" : "mp4";
-    downloadBlob(cutBlob, `${base}-clip.${ext}`);
+    downloadBlob(cutBlob, `${base}-clip.mp4`);
   };
 
   const downloadFullVideo = () => {
@@ -789,7 +816,7 @@ function BetaApp() {
         )}
 
         {/* ─── STEP 5: edit transcript ─── */}
-        {clip && clipSegments.length > 0 && (
+        {clip && captionSegments.length > 0 && (
           <Step number={5} title="Review & edit captions">
             {translating ? (
               <div className="flex items-center justify-center gap-3 rounded-xl bg-primary/10 px-4 py-6 text-sm text-primary">
@@ -797,8 +824,24 @@ function BetaApp() {
                 Translating to {lang ? LANG_LABELS[lang] : "selected language"}…
               </div>
             ) : (
-              <div className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
-                {clipSegments.map((s) => {
+              <div className="space-y-3">
+                <div className="flex rounded-xl border border-border bg-card/40 p-1">
+                  {(["line", "word"] as CaptionMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setCaptionMode(mode)}
+                      className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium capitalize transition-colors ${
+                        captionMode === mode
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {mode} by {mode}
+                    </button>
+                  ))}
+                </div>
+                <div className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
+                {captionSegments.map((s) => {
                   const txt = displayFor(s);
                   return (
                     <div
@@ -825,13 +868,14 @@ function BetaApp() {
                     </div>
                   );
                 })}
+                </div>
               </div>
             )}
           </Step>
         )}
 
         {/* ─── STEP 6: export ─── */}
-        {clip && clipSegments.length > 0 && (
+        {clip && captionSegments.length > 0 && (
           <Step number={6} title="Download">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <button
@@ -855,9 +899,9 @@ function BetaApp() {
                   {cutting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      {cutting.stage === "loading" && "Loading encoder…"}
+                      {cutting.stage === "loading" && "Preparing…"}
                       {cutting.stage === "cutting" &&
-                        `Cutting${cutting.pct != null ? ` ${Math.round(cutting.pct * 100)}%` : "…"}`}
+                        `Server export${cutting.pct != null ? ` ${Math.round(cutting.pct * 100)}%` : "…"}`}
                       {cutting.stage === "recording" &&
                         `Recording fallback${cutting.pct != null ? ` ${Math.round(cutting.pct * 100)}%` : "…"}`}
                       {cutting.stage === "done" && "Ready"}
