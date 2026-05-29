@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { getSecret } from "@/lib/secrets.server";
 
 // Proxies a YouTube video URL into an MP4 download using RapidAPI's `yt-api`
 // (https://rapidapi.com/ytjar/api/yt-api). Requires a RAPIDAPI_KEY secret.
@@ -10,7 +11,7 @@ export const Route = createFileRoute("/api/youtube-fetch")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const key = process.env.RAPIDAPI_KEY;
+        const key = await getSecret("RAPIDAPI_KEY");
         if (!key) {
           return Response.json(
             { error: "RAPIDAPI_KEY is not configured. Add it in project secrets." },
@@ -42,7 +43,7 @@ export const Route = createFileRoute("/api/youtube-fetch")({
       },
 
       POST: async ({ request }) => {
-        const key = process.env.RAPIDAPI_KEY;
+        const key = await getSecret("RAPIDAPI_KEY");
         if (!key) {
           return Response.json(
             { error: "RAPIDAPI_KEY is not configured. Add it in project secrets." },

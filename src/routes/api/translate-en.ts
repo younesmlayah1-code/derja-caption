@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { getSecret } from "@/lib/secrets.server";
 
 type Item = { id: number | string; text: string };
 
@@ -6,7 +7,7 @@ export const Route = createFileRoute("/api/translate-en")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const key = process.env.LOVABLE_API_KEY;
+        const key = await getSecret("LOVABLE_API_KEY");
         if (!key) {
           return Response.json({ error: "LOVABLE_API_KEY is not configured." }, { status: 500 });
         }
