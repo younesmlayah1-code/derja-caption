@@ -301,14 +301,23 @@ function AdminPanel() {
                       </div>
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <button
-                        onClick={() => {
-                          if (confirm(`Delete ${u.email}?`)) del.mutate(u.id);
-                        }}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-destructive-foreground hover:bg-accent"
-                      >
-                        <Trash2 className="h-3 w-3" /> Delete
-                      </button>
+                      <div className="flex justify-end gap-1">
+                        <button
+                          onClick={() => handleResetPw(u.id, u.email)}
+                          className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:border-primary hover:text-primary"
+                          title="Set a new password for this user"
+                        >
+                          <Lock className="h-3 w-3" /> Reset pw
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete ${u.email}?`)) del.mutate(u.id);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-destructive-foreground hover:bg-accent"
+                        >
+                          <Trash2 className="h-3 w-3" /> Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
