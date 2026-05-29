@@ -1,15 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getSecret } from "@/lib/secrets.server";
-import { requireActiveUser } from "@/lib/access.server";
 
 export const Route = createFileRoute("/api/transcribe")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const gate = await requireActiveUser(request);
-        if (gate instanceof Response) return gate;
-
-        const apiKey = await getSecret("GROQ_API_KEY");
+        const apiKey = process.env.GROQ_API_KEY;
         if (!apiKey) {
           return Response.json({ error: "GROQ_API_KEY is not configured on the server." }, { status: 500 });
         }
@@ -25,8 +20,6 @@ export const Route = createFileRoute("/api/transcribe")({
         if (!(file instanceof File)) {
           return Response.json({ error: "Missing 'file' upload." }, { status: 400 });
         }
-        const languageRaw = incoming.get("language");
-        const language = typeof languageRaw === "string" && languageRaw.length > 0 ? languageRaw : "ar";
 
         const MAX = 25 * 1024 * 1024;
         if (file.size > MAX) {
@@ -36,12 +29,13 @@ export const Route = createFileRoute("/api/transcribe")({
           );
         }
 
-        // Derja-biased Arabic prompt: includes common Tunisian dialect words
-        // so Whisper transcribes in Derja (not Fosha/MSA), while staying in
-        // Arabic script. Keep it focused — overly long word lists cause
-        // repetition artifacts (handled separately by dedupeRepeats).
+        // Derja-biased prompt: keep Tunisian Arabic as Derja, but preserve
+        // code-switched French/English words in Latin letters instead of
+        // forcing everything into Arabic script.
         const derjaPrompt =
-          "تفريغ صوتي باللهجة التونسية الدارجة بالحروف العربية فقط، مع علامات الترقيم. " +
+          "فرّغ الكلام باللهجة التونسية الدارجة كما هو، لا تحوّله للفصحى. " +
+          "الكلام العربي اكتبه بالحروف العربية، وأي كلمة فرنسية أو إنجليزية منطوقة اكتبها بلغتها وبحروف Latin الأصلية. " +
+          "أمثلة: montage, business, marketing, problème, service. " +
           "أمثلة كلمات دارجة: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، باهي، موش، ماكش، توا، يعيشك، زادا، خاطر، نحب، نجم، نمشي، نشوف، نحكي، فما، أما، إيا.";
 
         const upstream = new FormData();
@@ -51,7 +45,6 @@ export const Route = createFileRoute("/api/transcribe")({
         upstream.append("timestamp_granularities[]", "segment");
         upstream.append("timestamp_granularities[]", "word");
         upstream.append("temperature", "0");
-        upstream.append("language", language);
         upstream.append("prompt", derjaPrompt);
 
         const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
@@ -80,6 +73,9 @@ export const Route = createFileRoute("/api/transcribe")({
           text: ((w.word ?? w.text) || "").trim(),
         })).filter((w) => w.text.length > 0);
 
+        // Assign each word to the segment whose [start,end] contains its
+        // midpoint. Guarantees every word lands in exactly one segment — no
+        // drops on boundaries.
         const segs = (data.segments ?? []).map((s, i) => ({
           id: typeof s.id === "number" ? s.id : i,
           start: s.start,
@@ -91,6 +87,7 @@ export const Route = createFileRoute("/api/transcribe")({
           const mid = (w.start + w.end) / 2;
           let idx = segs.findIndex((s) => mid >= s.start && mid <= s.end);
           if (idx === -1) {
+            // Fallback: nearest segment by distance to midpoint.
             let best = 0;
             let bestDist = Infinity;
             for (let i = 0; i < segs.length; i++) {
@@ -101,8 +98,14 @@ export const Route = createFileRoute("/api/transcribe")({
           }
           if (idx >= 0 && segs[idx]) segs[idx].words.push(w);
         }
-        const segments = segs.filter((s) => s.text.length > 0);
+        const rawSegments = segs;
 
+        // Drop segments that became empty after dedupe.
+        const segments = rawSegments.filter((s) => s.text.length > 0);
+
+        // Polish spelling, spacing, and punctuation with Lovable AI while
+        // preserving the original Derja words and meaning. Failures here are
+        // non-fatal — we fall back to the raw Whisper output.
         const polishedSegments = await polishSegments(segments).catch((e: unknown) => {
           console.error("polishSegments failed:", e);
           return segments;
@@ -111,6 +114,7 @@ export const Route = createFileRoute("/api/transcribe")({
         const fullText = polishedSegments.map((s: { text: string }) => s.text).join(" ").trim()
           || dedupeRepeats((data.text || "").trim());
 
+        // Forward Groq rate-limit headers so the UI can show "minutes left today".
         const h = res.headers;
         const rate = {
           limitAudioSeconds: numOrNull(h.get("x-ratelimit-limit-audio-seconds")),
@@ -132,11 +136,14 @@ function numOrNull(v: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-type PolishSeg = { id: number; start: number; end: number; text: string; words?: Array<{ start: number; end: number; text: string }> };
+type PolishSeg = { id: number; start: number; end: number; text: string };
 
+// Use Lovable AI to fix spelling, spacing and punctuation in Derja segments
+// while preserving the original wording and meaning. Returns same shape with
+// cleaned text. Throws on hard failure; caller falls back to raw segments.
 async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   if (segments.length === 0) return segments;
-  const key = await getSecret("LOVABLE_API_KEY");
+  const key = process.env.LOVABLE_API_KEY;
   if (!key) return segments;
 
   const payload = segments.map((s) => ({ id: s.id, text: s.text }));
@@ -146,6 +153,11 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
     "صحح الإملاء، أضف علامات الترقيم المناسبة (،.؟!)، أصلح المسافات، " +
     "وأزل الكلمات المكررة بشكل خاطئ. " +
     "حافظ بدقة على نفس الكلمات والمعنى واللهجة التونسية. لا تترجم للفصحى. " +
+    "مهم جداً: إذا كانت كلمة عربية الأحرف لكنها في الأصل كلمة فرنسية أو إنجليزية " +
+    "(مثل: برودو=produit، مونتاج=montage، بيزنس=business، ماركتينغ=marketing، " +
+    "بروبلام=problème، سارفيس=service، أورديناتور=ordinateur، تيليفون=téléphone، " +
+    "كومبيوتر=computer، فيديو=video، إيمايل=email)، أعد كتابتها بالحروف اللاتينية " +
+    "بالإملاء الصحيح للغة الأصلية. " +
     "لا تضف ولا تحذف معلومات. أرجع JSON فقط بنفس البنية: " +
     '[{"id":number,"text":string}, ...]';
 
@@ -177,6 +189,7 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   const content = j.choices?.[0]?.message?.content?.trim() ?? "";
   if (!content) return segments;
 
+  // Model may return either a bare array or an object wrapping it.
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
@@ -207,19 +220,24 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   });
 }
 
+// Collapse only obvious Whisper hallucination loops. We DO NOT touch a single
+// repeat (e.g. "لا لا", "شوية شوية") because those are valid speech. We only
+// act when something repeats 3+ times in a row — that's the real artifact.
 function dedupeRepeats(input: string): string {
   if (!input) return input;
+  // Collapse runs of the same character (6+) down to 2: "اااااااا" -> "اا".
   let s = input.replace(/(.)\1{5,}/g, "$1$1");
 
   const words = s.split(/\s+/).filter(Boolean);
   if (words.length < 3) return s.trim();
 
+  // Collapse a word repeated 3+ times in a row down to a single instance.
   const out: string[] = [];
   let run = 1;
   for (let i = 0; i < words.length; i++) {
     if (i > 0 && words[i] === words[i - 1]) {
       run++;
-      if (run >= 3) continue;
+      if (run >= 3) continue; // skip 3rd+ repetition
       out.push(words[i]);
     } else {
       run = 1;
@@ -227,6 +245,7 @@ function dedupeRepeats(input: string): string {
     }
   }
 
+  // Collapse n-gram phrases repeated 3+ times (n=2..5).
   for (let n = 2; n <= 5; n++) {
     let i = 0;
     while (i + 3 * n <= out.length) {
@@ -234,6 +253,7 @@ function dedupeRepeats(input: string): string {
       const b = out.slice(i + n, i + 2 * n).join(" ");
       const c = out.slice(i + 2 * n, i + 3 * n).join(" ");
       if (a === b && b === c) {
+        // Drop the 3rd copy, keep checking from same position for more.
         out.splice(i + 2 * n, n);
       } else {
         i++;
