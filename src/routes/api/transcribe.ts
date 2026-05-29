@@ -115,7 +115,7 @@ export const Route = createFileRoute("/api/transcribe")({
         // Drop segments that became empty after dedupe.
         const segments = rawSegments.filter((s) => s.text.length > 0);
 
-        // Polish spelling, spacing, and punctuation with Lovable AI while
+        // Polish spelling, spacing, and punctuation with the configured AI while
         // preserving the original Derja words and meaning. Failures here are
         // non-fatal — we fall back to the raw Whisper output.
         const polishedSegments = (
@@ -252,7 +252,7 @@ function syncWordsToSegmentText(seg: PolishSeg): PolishSeg {
   };
 }
 
-// Use Lovable AI to fix spelling, spacing and punctuation in Derja segments
+// Use the configured AI to fix spelling, spacing and punctuation in Derja segments
 // while preserving the original wording and meaning. Returns same shape with
 // cleaned text. Throws on hard failure; caller falls back to raw segments.
 async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
