@@ -39,6 +39,40 @@ export const Route = createFileRoute("/api/transcribe")({
           );
         }
 
+        // ---------- PRIMARY PATH: Gemini-on-audio ----------
+        // Whisper consistently mangles French/English code-switching in Derja.
+        // Gemini 2.5 handles native code-switching well — use it as the
+        // primary transcriber and return its timed segments directly.
+        if (geminiKey) {
+          try {
+            const result = await transcribeWithGemini(file, geminiKey);
+            if (result && result.segments.length > 0) {
+              return Response.json({
+                text: result.text,
+                segments: result.segments,
+                words: result.segments.flatMap((s) => s.words ?? []),
+                rate: {
+                  limitAudioSeconds: null,
+                  remainingAudioSeconds: null,
+                  resetAudioSeconds: null,
+                  limitRequests: null,
+                  remainingRequests: null,
+                },
+              });
+            }
+          } catch (e) {
+            console.error("Gemini primary transcription failed, falling back to Groq:", e);
+          }
+        }
+
+        if (!apiKey) {
+          return Response.json(
+            { error: "Gemini transcription failed and GROQ_API_KEY fallback is not configured." },
+            { status: 500 },
+          );
+        }
+
+        // ---------- FALLBACK PATH: Groq Whisper + polish ----------
         // Derja-biased prompt: keep Tunisian Arabic as Derja, but preserve
         // code-switched French/English words in Latin letters instead of
         // forcing everything into Arabic script.
@@ -47,6 +81,7 @@ export const Route = createFileRoute("/api/transcribe")({
           "الكلام العربي/الدارجة اكتبه بالحروف العربية، لكن أي كلمة فرنسية أو إنجليزية منطوقة اكتبها بلغتها الأصلية وبحروف Latin، لا تكتبها بحروف عربية. " +
           "أمثلة فرنسي/إنجليزي لازم تبقى Latin: produit, montage, business, marketing, problème, service, réseau, rendez-vous, téléphone, ordinateur, boutique, email, wifi, download, link. " +
           "أمثلة كلمات دارجة تبقى عربية: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، باهي، موش، ماكش، توا، يعيشك، زادا، خاطر، نحب، نجم، نمشي، نشوف، نحكي، فما، أما، إيا.";
+
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
