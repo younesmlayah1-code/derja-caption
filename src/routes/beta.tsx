@@ -165,7 +165,7 @@ function BetaApp() {
   };
 
   // ------- Step 2: language selection -------
-  const [lang, setLang] = useState<Lang>("derja-ar");
+  const [lang, setLang] = useState<Lang | null>(null);
 
   // ------- Step 3: transcribe (full video) -------
   type Stage = "idle" | "extracting" | "uploading" | "transcribing" | "done" | "error";
@@ -317,7 +317,7 @@ function BetaApp() {
   const [translating, setTranslating] = useState(false);
 
   useEffect(() => {
-    if (!clip || clipSegments.length === 0) return;
+    if (!lang || !clip || clipSegments.length === 0) return;
     if (lang === "derja-ar") return;
 
     const texts = clipSegments.map((s) => s.text).filter(Boolean);
@@ -375,7 +375,7 @@ function BetaApp() {
   }, [lang, clipSegments, clip, englishMap, frenchMap, frenchDerjaMap]);
 
   const baseTextFor = (s: Segment): string => {
-    if (lang === "derja-ar") return s.text;
+    if (!lang || lang === "derja-ar") return s.text;
     if (lang === "english") return englishMap.get(s.text) ?? s.text;
     if (lang === "french") return frenchMap.get(s.text) ?? s.text;
     return frenchDerjaMap.get(s.text) ?? s.text;
@@ -384,12 +384,12 @@ function BetaApp() {
   // ------- Step 5: editable transcript -------
   // Override key = `${lang}:${id}` so edits per language stay separate.
   const [overrides, setOverrides] = useState<Map<string, string>>(new Map());
-  const displayFor = (s: Segment): string => overrides.get(`${lang}:${s.id}`) ?? baseTextFor(s);
+  const displayFor = (s: Segment): string => overrides.get(`${lang ?? "derja-ar"}:${s.id}`) ?? baseTextFor(s);
 
   const updateSegment = (id: number, value: string) => {
     setOverrides((prev) => {
       const next = new Map(prev);
-      next.set(`${lang}:${id}`, value);
+      next.set(`${lang ?? "derja-ar"}:${id}`, value);
       return next;
     });
   };
