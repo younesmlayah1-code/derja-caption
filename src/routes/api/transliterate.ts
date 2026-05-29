@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { transliterateDerja } from "@/lib/subtitles";
 import { getSecret } from "@/lib/secrets.server";
+import { requireActiveUser } from "@/lib/access.server";
 
 
 type Item = { id: number | string; text: string };
@@ -9,6 +10,8 @@ export const Route = createFileRoute("/api/transliterate")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const gate = await requireActiveUser(request);
+        if (gate instanceof Response) return gate;
         const key = await getSecret("LOVABLE_API_KEY");
         if (!key) {
           return Response.json({ error: "LOVABLE_API_KEY is not configured." }, { status: 500 });
