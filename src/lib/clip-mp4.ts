@@ -294,7 +294,14 @@ export async function cutMp4Clip(
 
     let lastError: unknown = null;
     let outputBytes: Uint8Array | null = null;
-    for (const mode of ["fast-copy", "copy", "reencode"] as const) {
+    for (const mode of [
+      "fast-copy",
+      "copy",
+      "remux-audio",
+      "h264-aac",
+      "native-mp4",
+      "video-only",
+    ] as const) {
       try {
         try {
           await ff.deleteFile(outputName);
