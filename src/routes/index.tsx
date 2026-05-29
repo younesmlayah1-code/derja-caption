@@ -711,38 +711,6 @@ function Home() {
               )}
             </section>
 
-            {!file && (
-              <section className="mt-5 rounded-3xl border border-border bg-card/30 p-5 backdrop-blur md:p-6">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                  <Youtube className="h-4 w-4 text-primary" />
-                  Or paste a YouTube link
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <input
-                    type="url"
-                    placeholder="https://www.youtube.com/watch?v=…"
-                    value={ytUrl}
-                    onChange={(e) => setYtUrl(e.target.value)}
-                    disabled={ytLoading}
-                    className="flex-1 rounded-xl border border-border bg-background/80 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                  <button
-                    onClick={fetchYouTube}
-                    disabled={ytLoading || !ytUrl.trim()}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                  >
-                    {ytLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                    {ytLoading ? "Fetching…" : "Fetch MP4"}
-                  </button>
-                </div>
-                {ytError && (
-                  <p className="mt-2 text-xs text-destructive-foreground">{ytError}</p>
-                )}
-                <p className="mt-2 text-xs text-muted-foreground/70">
-                  Resolves the smallest MP4 with audio for transcription. Long videos may take a while.
-                </p>
-              </section>
-            )}
           </>
         )}
 
