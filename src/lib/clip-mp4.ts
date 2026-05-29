@@ -352,7 +352,11 @@ async function recordClipFallback(
       };
     });
 
+    let stopTimer = 0;
+    let stoppedOnce = false;
     const stopRecording = () => {
+      if (stoppedOnce) return;
+      stoppedOnce = true;
       if (recorder.state !== "inactive") recorder.stop();
       video.pause();
     };
@@ -364,17 +368,13 @@ async function recordClipFallback(
       onProgress?.({ stage: "recording", pct, note: "Encoder fallback" });
     }, 500);
 
-    recorder.start(1000);
-    try {
-      await video.play();
-    } catch {
-      video.muted = true;
-      await video.play();
-    }
-    window.setTimeout(stopRecording, duration * 1000 + 1500);
+    recorder.start(250);
+    await video.play();
+    stopTimer = window.setTimeout(stopRecording, duration * 1000 + 1500);
     return await stopped;
   } finally {
     if (progressTimer) window.clearInterval(progressTimer);
+    if (stopTimer) window.clearTimeout(stopTimer);
     video.remove();
     URL.revokeObjectURL(url);
   }
