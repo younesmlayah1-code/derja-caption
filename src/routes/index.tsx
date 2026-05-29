@@ -664,12 +664,6 @@ function Home() {
               ))}
             </div>
 
-            <VideoBurner
-              segments={scriptedSegments()}
-              mode={exportMode}
-              script={script}
-              sourceFile={file}
-            />
           </section>
         )}
 
