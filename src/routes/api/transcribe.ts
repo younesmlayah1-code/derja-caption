@@ -35,9 +35,9 @@ export const Route = createFileRoute("/api/transcribe")({
         // forcing everything into Arabic script.
         const derjaPrompt =
           "فرّغ الكلام باللهجة التونسية الدارجة كما هو، لا تحوّله للفصحى. " +
-          "الكلام العربي اكتبه بالحروف العربية، وأي كلمة فرنسية أو إنجليزية منطوقة اكتبها بلغتها وبحروف Latin الأصلية. " +
-          "أمثلة: montage, business, marketing, problème, service. " +
-          "أمثلة كلمات دارجة: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، باهي، موش، ماكش، توا، يعيشك، زادا، خاطر، نحب، نجم، نمشي، نشوف، نحكي، فما، أما، إيا.";
+          "الكلام العربي/الدارجة اكتبه بالحروف العربية، لكن أي كلمة فرنسية أو إنجليزية منطوقة اكتبها بلغتها الأصلية وبحروف Latin، لا تكتبها بحروف عربية. " +
+          "أمثلة فرنسي/إنجليزي لازم تبقى Latin: produit, montage, business, marketing, problème, service, réseau, rendez-vous, téléphone, ordinateur, boutique, email, wifi, download, link. " +
+          "أمثلة كلمات دارجة تبقى عربية: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، باهي، موش، ماكش، توا، يعيشك، زادا، خاطر، نحب، نجم، نمشي، نشوف، نحكي، فما، أما، إيا.";
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
@@ -71,7 +71,7 @@ export const Route = createFileRoute("/api/transcribe")({
         const allWords = (data.words ?? []).map((w) => ({
           start: w.start,
           end: w.end,
-          text: ((w.word ?? w.text) || "").trim(),
+          text: normalizeLoanwords(((w.word ?? w.text) || "").trim()),
         })).filter((w) => w.text.length > 0);
 
         // Assign each word to the segment whose [start,end] contains its
@@ -81,7 +81,7 @@ export const Route = createFileRoute("/api/transcribe")({
           id: typeof s.id === "number" ? s.id : i,
           start: s.start,
           end: s.end,
-          text: dedupeRepeats((s.text || "").trim()),
+          text: normalizeLoanwords(dedupeRepeats((s.text || "").trim())),
           words: [] as typeof allWords,
         }));
         for (const w of allWords) {
@@ -110,10 +110,10 @@ export const Route = createFileRoute("/api/transcribe")({
         const polishedSegments = await polishSegments(segments).catch((e: unknown) => {
           console.error("polishSegments failed:", e);
           return segments;
-        });
+        }).then((items) => items.map(syncWordsToSegmentText));
 
         const fullText = polishedSegments.map((s: { text: string }) => s.text).join(" ").trim()
-          || dedupeRepeats((data.text || "").trim());
+          || normalizeLoanwords(dedupeRepeats((data.text || "").trim()));
 
         // Forward Groq rate-limit headers so the UI can show "minutes left today".
         const h = res.headers;
@@ -125,7 +125,9 @@ export const Route = createFileRoute("/api/transcribe")({
           remainingRequests: numOrNull(h.get("x-ratelimit-remaining-requests")),
         };
 
-        return Response.json({ text: fullText, segments: polishedSegments, words: allWords, rate });
+        const polishedWords = polishedSegments.flatMap((s) => s.words ?? []);
+
+        return Response.json({ text: fullText, segments: polishedSegments, words: polishedWords, rate });
       },
     },
   },
