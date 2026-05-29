@@ -59,15 +59,16 @@ export function AccessGate({ children }: { children: ReactNode }) {
             <p className="text-sm text-muted-foreground">
               Account <b>{access?.email}</b>{" "}
               {expired
-                ? "no longer has access. Renew a plan to keep using Derja Caption."
+                ? "no longer has access. Please renew a plan to keep using Derja Caption."
                 : "is on the Free plan. Pick a plan to unlock Derja Caption."}
             </p>
           </div>
           <Link
             to="/account"
+            hash="plans"
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
-            View plans <ArrowRight className="h-4 w-4" />
+            {expired ? "Renew plan" : "View plans"} <ArrowRight className="h-4 w-4" />
           </Link>
           <button
             onClick={async () => {
