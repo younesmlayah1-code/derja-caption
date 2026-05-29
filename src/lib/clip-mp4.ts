@@ -387,12 +387,11 @@ export async function cutMp4Clip(
   onProgress?: ClipProgress,
 ): Promise<Blob> {
   onProgress?.({ stage: "loading" });
-  const ff = await getFFmpeg();
-
   const duration = Math.max(0.1, endSec - startSec);
   const inputFileName = "input" + extensionFor(file);
   let inputName = `/input/${inputFileName}`;
   const outputName = `clip-${Date.now()}.mp4`;
+  let ff: FFmpeg | null = null;
   let mounted = false;
 
   const progressHandler = ({ progress }: { progress: number }) => {
@@ -403,6 +402,9 @@ export async function cutMp4Clip(
   recentLogs.length = 0;
 
   try {
+    ff = await getFFmpeg();
+    ff.on("progress", progressHandler);
+
     try {
       await ff.createDir("/input");
     } catch {
@@ -474,6 +476,7 @@ export async function cutMp4Clip(
       throw new Error(`${errorDetails(e)}. Fallback failed: ${errorDetails(fallbackError)}`);
     }
   } finally {
+    if (!ff) return;
     ff.off("progress", progressHandler);
     if (mounted) {
       try {
