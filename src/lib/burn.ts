@@ -267,6 +267,7 @@ async function ensureFonts(ff: FFmpeg) {
 export async function burnSubtitles(opts: {
   videoFile: File;
   ass: string;
+  durationSec?: number;
   onProgress?: (ratio: number) => void;
   onLog?: (msg: string) => void;
 }): Promise<Blob> {
@@ -281,32 +282,66 @@ export async function burnSubtitles(opts: {
   await ff.writeFile(inputName, await fetchFile(opts.videoFile));
   await ff.writeFile(subName, new TextEncoder().encode(opts.ass));
 
-  if (opts.onProgress) {
-    ff.on("progress", ({ progress }) => opts.onProgress!(Math.min(1, Math.max(0, progress))));
-  }
+  // Progress: the built-in "progress" event is unreliable with filter graphs,
+  // so parse "time=HH:MM:SS.cs" from logs as a robust fallback.
+  let lastRatio = 0;
+  const report = (r: number) => {
+    if (!opts.onProgress) return;
+    const v = Math.min(0.99, Math.max(0, r));
+    if (v > lastRatio) {
+      lastRatio = v;
+      opts.onProgress(v);
+    }
+  };
+  const progressHandler = ({ progress }: { progress: number }) => {
+    if (Number.isFinite(progress) && progress > 0) report(progress);
+  };
+  const logHandler = ({ message }: { message: string }) => {
+    if (opts.onLog) opts.onLog(message);
+    if (!opts.durationSec) return;
+    const m = message.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/);
+    if (m) {
+      const t = +m[1] * 3600 + +m[2] * 60 + parseFloat(m[3]);
+      report(t / opts.durationSec);
+    }
+  };
+  ff.on("progress", progressHandler);
+  ff.on("log", logHandler);
 
   // libass filter; fontsdir lets it find our bundled fonts.
   const filter = `subtitles=${subName}:fontsdir=/fonts`;
 
-  await ff.exec([
-    "-i",
-    inputName,
-    "-vf",
-    filter,
-    "-c:v",
-    "libx264",
-    "-preset",
-    "ultrafast",
-    "-crf",
-    "23",
-    "-c:a",
-    "copy",
-    "-movflags",
-    "+faststart",
-    "-y",
-    outputName,
-  ]);
+  try {
+    await ff.exec([
+      "-i",
+      inputName,
+      "-vf",
+      filter,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-tune",
+      "fastdecode,zerolatency",
+      "-crf",
+      "28",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "copy",
+      "-movflags",
+      "+faststart",
+      "-threads",
+      "0",
+      "-y",
+      outputName,
+    ]);
+  } finally {
+    ff.off("progress", progressHandler);
+    ff.off("log", logHandler);
+  }
 
+  if (opts.onProgress) opts.onProgress(1);
   const data = (await ff.readFile(outputName)) as Uint8Array;
   // Cleanup
   await ff.deleteFile(inputName).catch(() => {});

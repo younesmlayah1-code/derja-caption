@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Film, Loader2, Download, Upload, X, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Film, Loader2, Download, Upload, X, Sparkles, Clock } from "lucide-react";
 import {
   BURN_STYLES,
   type BurnStyle,
@@ -23,6 +23,13 @@ type Props = {
 
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
 
+function fmtTime(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r.toString().padStart(2, "0")}`;
+}
+
 function isVideoFile(f: File | null): boolean {
   if (!f) return false;
   return f.type.startsWith("video/") || /\.(mp4|mov|webm|avi|mkv)$/i.test(f.name);
@@ -37,7 +44,19 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultSize, setResultSize] = useState<number>(0);
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!busy) return;
+    startRef.current = Date.now();
+    setElapsed(0);
+    const id = window.setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [busy]);
 
   const pickVideo = (f: File) => {
     setError(null);
@@ -57,24 +76,28 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
 
   const fontName = script === "arabic" ? ARABIC_FONT_NAME : LATIN_FONT_NAME;
 
-  const probeDimensions = useCallback((file: File): Promise<{ w: number; h: number }> => {
-    return new Promise((resolve) => {
-      const v = document.createElement("video");
-      v.preload = "metadata";
-      v.muted = true;
-      v.src = URL.createObjectURL(file);
-      v.onloadedmetadata = () => {
-        const w = v.videoWidth || 1080;
-        const h = v.videoHeight || 1920;
-        URL.revokeObjectURL(v.src);
-        resolve({ w, h });
-      };
-      v.onerror = () => {
-        URL.revokeObjectURL(v.src);
-        resolve({ w: 1080, h: 1920 });
-      };
-    });
-  }, []);
+  const probeMeta = useCallback(
+    (file: File): Promise<{ w: number; h: number; duration: number }> => {
+      return new Promise((resolve) => {
+        const v = document.createElement("video");
+        v.preload = "metadata";
+        v.muted = true;
+        v.src = URL.createObjectURL(file);
+        v.onloadedmetadata = () => {
+          const w = v.videoWidth || 1080;
+          const h = v.videoHeight || 1920;
+          const duration = Number.isFinite(v.duration) ? v.duration : 0;
+          URL.revokeObjectURL(v.src);
+          resolve({ w, h, duration });
+        };
+        v.onerror = () => {
+          URL.revokeObjectURL(v.src);
+          resolve({ w: 1080, h: 1920, duration: 0 });
+        };
+      });
+    },
+    [],
+  );
 
   const run = async () => {
     if (!video) return;
@@ -83,7 +106,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
     setProgress(0);
     setPhase("Preparing FFmpeg…");
     try {
-      const { w, h } = await probeDimensions(video);
+      const { w, h, duration } = await probeMeta(video);
       const ass = buildAss(segments, {
         style,
         mode,
@@ -96,6 +119,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
       const blob = await burnSubtitles({
         videoFile: video,
         ass,
+        durationSec: duration || undefined,
         onProgress: (r) => setProgress(r),
       });
       const url = URL.createObjectURL(blob);
@@ -227,7 +251,7 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
           <div className="rounded-lg bg-primary/10 px-4 py-3">
             <div className="flex items-center gap-2 text-sm text-primary">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{phase}</span>
+              <span className="truncate">{phase}</span>
               <span className="ml-auto font-mono text-xs">
                 {Math.round(progress * 100)}%
               </span>
@@ -237,6 +261,17 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
                 className="h-full bg-primary transition-[width] duration-200"
                 style={{ width: `${Math.max(2, progress * 100)}%` }}
               />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[11px] font-mono text-primary/80">
+              <span className="inline-flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {fmtTime(elapsed)} elapsed
+              </span>
+              <span>
+                {progress > 0.02
+                  ? `~${fmtTime(Math.max(1, Math.round(elapsed / progress - elapsed)))} left`
+                  : "estimating…"}
+              </span>
             </div>
           </div>
         )}
