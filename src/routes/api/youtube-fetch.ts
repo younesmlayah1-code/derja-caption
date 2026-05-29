@@ -89,15 +89,15 @@ export const Route = createFileRoute("/api/youtube-fetch")({
             (f.mimeType || "").includes("video/mp4") &&
             (f.audioQuality || f.audioChannels || (f.mimeType || "").includes("mp4a")),
         );
-        let chosen = combined.sort(
-          (a, b) => (a.contentLength ?? 1e15) - (b.contentLength ?? 1e15),
-        )[0];
+        const sizeOf = (f: YtFormat) =>
+          f.contentLength != null ? Number(f.contentLength) || 1e15 : 1e15;
+        let chosen = combined.sort((a, b) => sizeOf(a) - sizeOf(b))[0];
 
         // Fallback: any mp4 video format.
         if (!chosen) {
           chosen = formats
             .filter((f) => (f.mimeType || "").includes("video/mp4") && f.url)
-            .sort((a, b) => (a.contentLength ?? 1e15) - (b.contentLength ?? 1e15))[0];
+            .sort((a, b) => sizeOf(a) - sizeOf(b))[0];
         }
 
         if (!chosen || !chosen.url) {
