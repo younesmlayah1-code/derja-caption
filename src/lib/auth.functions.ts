@@ -144,6 +144,25 @@ export const adminDeleteUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const adminResetUserPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        userId: z.string().uuid(),
+        password: z.string().min(6).max(128),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(supabaseAdmin, context.userId);
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      password: data.password,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 const MANAGED = ["GROQ_API_KEY", "LOVABLE_API_KEY", "RAPIDAPI_KEY"] as const;
 type ManagedKey = (typeof MANAGED)[number];
 
