@@ -25,6 +25,8 @@ export const Route = createFileRoute("/api/transcribe")({
         if (!(file instanceof File)) {
           return Response.json({ error: "Missing 'file' upload." }, { status: 400 });
         }
+        const languageRaw = incoming.get("language");
+        const language = typeof languageRaw === "string" && languageRaw.length > 0 ? languageRaw : "ar";
 
         const MAX = 25 * 1024 * 1024;
         if (file.size > MAX) {
@@ -45,9 +47,11 @@ export const Route = createFileRoute("/api/transcribe")({
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
         upstream.append("model", "whisper-large-v3");
-        upstream.append("language", "ar");
         upstream.append("response_format", "verbose_json");
+        upstream.append("timestamp_granularities[]", "segment");
+        upstream.append("timestamp_granularities[]", "word");
         upstream.append("temperature", "0");
+        upstream.append("language", language);
         upstream.append("prompt", derjaPrompt);
 
         const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
@@ -67,21 +71,38 @@ export const Route = createFileRoute("/api/transcribe")({
         const data = (await res.json()) as {
           text?: string;
           segments?: Array<{ id?: number; start: number; end: number; text: string }>;
+          words?: Array<{ word?: string; text?: string; start: number; end: number }>;
         };
 
-        const rawSegments = (data.segments ?? []).map((s, i) => ({
+        const allWords = (data.words ?? []).map((w) => ({
+          start: w.start,
+          end: w.end,
+          text: ((w.word ?? w.text) || "").trim(),
+        })).filter((w) => w.text.length > 0);
+
+        const segs = (data.segments ?? []).map((s, i) => ({
           id: typeof s.id === "number" ? s.id : i,
           start: s.start,
           end: s.end,
           text: dedupeRepeats((s.text || "").trim()),
+          words: [] as typeof allWords,
         }));
+        for (const w of allWords) {
+          const mid = (w.start + w.end) / 2;
+          let idx = segs.findIndex((s) => mid >= s.start && mid <= s.end);
+          if (idx === -1) {
+            let best = 0;
+            let bestDist = Infinity;
+            for (let i = 0; i < segs.length; i++) {
+              const d = Math.min(Math.abs(mid - segs[i].start), Math.abs(mid - segs[i].end));
+              if (d < bestDist) { bestDist = d; best = i; }
+            }
+            idx = best;
+          }
+          if (idx >= 0 && segs[idx]) segs[idx].words.push(w);
+        }
+        const segments = segs.filter((s) => s.text.length > 0);
 
-        // Drop segments that became empty after dedupe.
-        const segments = rawSegments.filter((s) => s.text.length > 0);
-
-        // Polish spelling, spacing, and punctuation with Lovable AI while
-        // preserving the original Derja words and meaning. Failures here are
-        // non-fatal — we fall back to the raw Whisper output.
         const polishedSegments = await polishSegments(segments).catch((e: unknown) => {
           console.error("polishSegments failed:", e);
           return segments;
@@ -90,7 +111,6 @@ export const Route = createFileRoute("/api/transcribe")({
         const fullText = polishedSegments.map((s: { text: string }) => s.text).join(" ").trim()
           || dedupeRepeats((data.text || "").trim());
 
-        // Forward Groq rate-limit headers so the UI can show "minutes left today".
         const h = res.headers;
         const rate = {
           limitAudioSeconds: numOrNull(h.get("x-ratelimit-limit-audio-seconds")),
@@ -100,7 +120,7 @@ export const Route = createFileRoute("/api/transcribe")({
           remainingRequests: numOrNull(h.get("x-ratelimit-remaining-requests")),
         };
 
-        return Response.json({ text: fullText, segments: polishedSegments, rate });
+        return Response.json({ text: fullText, segments: polishedSegments, words: allWords, rate });
       },
     },
   },
@@ -112,7 +132,7 @@ function numOrNull(v: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-type PolishSeg = { id: number; start: number; end: number; text: string };
+type PolishSeg = { id: number; start: number; end: number; text: string; words?: Array<{ start: number; end: number; text: string }> };
 
 async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   if (segments.length === 0) return segments;
