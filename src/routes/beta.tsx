@@ -130,6 +130,7 @@ function BetaApp() {
     setSegments([]);
     setTranscript("");
     setClip(null);
+    setLang(null);
     setTriedRanges([]);
     setEnglishMap(new Map());
     setFrenchMap(new Map());
@@ -443,6 +444,7 @@ function BetaApp() {
     setSegments([]);
     setTranscript("");
     setClip(null);
+    setLang(null);
     setTriedRanges([]);
     setEnglishMap(new Map());
     setFrenchMap(new Map());
