@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Upload,
@@ -16,6 +16,7 @@ import {
   Scissors,
   Sparkles,
   LogOut,
+  FlaskConical,
 } from "lucide-react";
 import {
   toSrt,
@@ -930,6 +931,14 @@ function Home() {
 
         <footer className="mt-16 text-center text-xs text-muted-foreground/60">
           Built for Tunisian Derja · Whisper transcription · Lovable AI translation & clip picking
+          <div className="mt-3">
+            <Link
+              to="/beta"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <FlaskConical className="h-3 w-3" /> Beta workspace
+            </Link>
+          </div>
         </footer>
       </div>
     </main>
