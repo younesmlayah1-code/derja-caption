@@ -429,7 +429,8 @@ function BetaApp() {
       const ext = blob.type.includes("webm") ? "webm" : "mp4";
       downloadBlob(blob, `${base}-clip.${ext}`);
     } catch (e) {
-      const message = e instanceof Error && e.message ? e.message : String(e || "Video export failed.");
+      const message =
+        e instanceof Error && e.message ? e.message : String(e || "Video export failed.");
       setError("Clip download failed: " + message);
       setCutting(null);
     }
@@ -891,7 +892,8 @@ function BetaApp() {
               </button>
             </div>
             <p className="mt-2 text-xs text-muted-foreground/70">
-              The clip downloads automatically after export. Full video download uses the original file.
+              The clip downloads automatically after export. Full video download uses the original
+              file.
             </p>
           </Step>
         )}
