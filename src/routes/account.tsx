@@ -5,7 +5,6 @@ import {
   Crown,
   Infinity as InfinityIcon,
   Clock3,
-  LogOut,
   ArrowLeft,
   MessageCircle,
   ShieldCheck,
@@ -77,15 +76,6 @@ function AccountPage() {
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Back
         </Link>
-        <button
-          onClick={async () => {
-            await supabase.auth.signOut();
-            navigate({ to: "/login" });
-          }}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-accent"
-        >
-          <LogOut className="h-3.5 w-3.5" /> Sign out
-        </button>
       </div>
 
       {/* Hero plan card */}
