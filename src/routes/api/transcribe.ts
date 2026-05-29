@@ -39,12 +39,9 @@ export const Route = createFileRoute("/api/transcribe")({
         // Derja-biased prompt: keep Tunisian Arabic as Derja, but preserve
         // code-switched French/English words in Latin letters instead of
         // forcing everything into Arabic script.
+        // Derja-biased prompt. Whisper caps prompt at 224 tokens — keep it short.
         const derjaPrompt =
-          "تفريغ دقيق للهجة التونسية الدارجة كما تُنطق، بدون تحويل للفصحى وبدون إضافة كلمات. " +
-          "اكتب العربي بالحروف العربية مع التشكيل عند الضرورة، وأي كلمة فرنسية أو إنجليزية اكتبها بحروفها الأصلية بإملاء صحيح. " +
-          "أمثلة كلمات أجنبية شائعة: montage, business, marketing, problème, service, ordinateur, téléphone, week-end, ok, bon, voilà. " +
-          "أمثلة كلمات دارجة: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، باهي، موش، ماكش، توا، يعيشك، زادا، خاطر، نحب، نجم، نمشي، نشوف، نحكي، فما، أما، إيا، صحّة، يا سيدي، مالا، تو، هاو، هاكا، أهوكا. " +
-          "استعمل علامات الترقيم (،.؟!) بشكل طبيعي. لا تكرر الكلمات بدون داعٍ.";
+          "تفريغ باللهجة التونسية الدارجة كما تُنطق. اكتب العربي بالعربية، والكلمات الفرنسية والإنجليزية بحروفها اللاتينية (montage, business, service, problème, week-end). استعمل الترقيم (،.؟!).";
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
