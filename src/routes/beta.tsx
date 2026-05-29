@@ -191,10 +191,16 @@ function BetaApp() {
     }
   }, [file]);
 
-  // ------- Step 3: AI clip suggestion + regenerate -------
+  // ------- Step 3: AI clip suggestion + regenerate + manual -------
   const [clip, setClip] = useState<Clip | null>(null);
   const [clipLoading, setClipLoading] = useState(false);
   const [triedRanges, setTriedRanges] = useState<Array<{ start: number; end: number }>>([]);
+  const [targetDuration, setTargetDuration] = useState<number>(90);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualStart, setManualStart] = useState<string>("0");
+  const [manualEnd, setManualEnd] = useState<string>("90");
+
+  const totalDuration = segments.length > 0 ? segments[segments.length - 1].end : 0;
 
   const suggestClip = async (regenerate: boolean) => {
     if (segments.length === 0) return;
@@ -203,14 +209,16 @@ function BetaApp() {
     setCutBlob(null);
     try {
       const exclude = regenerate && clip ? [...triedRanges, { start: clip.start, end: clip.end }] : [];
+      const minSec = Math.max(15, targetDuration - 10);
+      const maxSec = targetDuration + 10;
       const res = await fetch("/api/suggest-clip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           segments: segments.map((s) => ({ id: s.id, start: s.start, end: s.end, text: s.text })),
           excludeRanges: exclude,
-          minSec: 90,
-          maxSec: 180,
+          minSec,
+          maxSec,
         }),
       });
       const j = (await res.json()) as Partial<Clip> & { error?: string };
@@ -223,11 +231,20 @@ function BetaApp() {
       };
       if (regenerate && clip) setTriedRanges((prev) => [...prev, { start: clip.start, end: clip.end }]);
       setClip(newClip);
+      setManualStart(newClip.start.toFixed(1));
+      setManualEnd(newClip.end.toFixed(1));
     } catch (e) {
       setError((e as Error).message || "Clip suggestion failed.");
     } finally {
       setClipLoading(false);
     }
+  };
+
+  const applyManualClip = () => {
+    const s = Math.max(0, Math.min(totalDuration, parseFloat(manualStart) || 0));
+    const e = Math.max(s + 1, Math.min(totalDuration, parseFloat(manualEnd) || s + 1));
+    setCutBlob(null);
+    setClip({ start: s, end: e, title: "Manual clip", reason: "" });
   };
 
   // ------- Step 3b: clip preview (clamp to range) -------
