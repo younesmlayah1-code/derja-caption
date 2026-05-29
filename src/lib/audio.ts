@@ -4,7 +4,7 @@
 // videos transcribe end-to-end instead of getting truncated.
 
 const TARGET_SAMPLE_RATE = 16000;
-const CHUNK_SECONDS = 300; // 5 min per chunk -> ~9.5 MB WAV, safer for long videos
+const CHUNK_SECONDS = 600; // 10 min per chunk -> ~19MB WAV, fewer chunks = better context & fewer boundary cuts
 
 export type AudioChunk = {
   blob: Blob;

@@ -20,6 +20,8 @@ export const Route = createFileRoute("/api/transcribe")({
         if (!(file instanceof File)) {
           return Response.json({ error: "Missing 'file' upload." }, { status: 400 });
         }
+        const languageRaw = incoming.get("language");
+        const language = typeof languageRaw === "string" && languageRaw.length > 0 ? languageRaw : "ar";
 
         const MAX = 25 * 1024 * 1024;
         if (file.size > MAX) {
@@ -33,10 +35,11 @@ export const Route = createFileRoute("/api/transcribe")({
         // code-switched French/English words in Latin letters instead of
         // forcing everything into Arabic script.
         const derjaPrompt =
-          "فرّغ الكلام باللهجة التونسية الدارجة كما هو، لا تحوّله للفصحى. " +
-          "الكلام العربي اكتبه بالحروف العربية، وأي كلمة فرنسية أو إنجليزية منطوقة اكتبها بلغتها وبحروف Latin الأصلية. " +
-          "أمثلة: montage, business, marketing, problème, service. " +
-          "أمثلة كلمات دارجة: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، باهي، موش، ماكش، توا، يعيشك، زادا، خاطر، نحب، نجم، نمشي، نشوف، نحكي، فما، أما، إيا.";
+          "تفريغ دقيق للهجة التونسية الدارجة كما تُنطق، بدون تحويل للفصحى وبدون إضافة كلمات. " +
+          "اكتب العربي بالحروف العربية مع التشكيل عند الضرورة، وأي كلمة فرنسية أو إنجليزية اكتبها بحروفها الأصلية بإملاء صحيح. " +
+          "أمثلة كلمات أجنبية شائعة: montage, business, marketing, problème, service, ordinateur, téléphone, week-end, ok, bon, voilà. " +
+          "أمثلة كلمات دارجة: برشا، ياسر، شنوة، علاش، كيفاش، وقتاش، باهي، موش، ماكش، توا، يعيشك، زادا، خاطر، نحب، نجم، نمشي، نشوف، نحكي، فما، أما، إيا، صحّة، يا سيدي، مالا، تو، هاو، هاكا، أهوكا. " +
+          "استعمل علامات الترقيم (،.؟!) بشكل طبيعي. لا تكرر الكلمات بدون داعٍ.";
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "audio.wav");
@@ -45,6 +48,7 @@ export const Route = createFileRoute("/api/transcribe")({
         upstream.append("timestamp_granularities[]", "segment");
         upstream.append("timestamp_granularities[]", "word");
         upstream.append("temperature", "0");
+        upstream.append("language", language);
         upstream.append("prompt", derjaPrompt);
 
         const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
