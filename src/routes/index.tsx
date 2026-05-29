@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Upload,
@@ -15,6 +15,7 @@ import {
   Youtube,
   Scissors,
   Sparkles,
+  LogOut,
 } from "lucide-react";
 import {
   toSrt,
@@ -30,6 +31,7 @@ import { transcribeFile, type RateInfo } from "@/lib/transcribe";
 import { AccessGate } from "@/components/AccessGate";
 import { PlanStatus } from "@/components/PlanStatus";
 import { authedFetch } from "@/lib/api-client";
+import { supabase } from "@/integrations/supabase/client";
 
 type Script = "arabic" | "french" | "english";
 
