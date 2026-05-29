@@ -16,7 +16,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { getMyAccess } from "@/lib/auth.functions";
+import { getMyAccess, getPlans } from "@/lib/auth.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { daysRemaining } from "@/components/PlanStatus";
 
