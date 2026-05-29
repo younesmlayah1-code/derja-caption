@@ -20,7 +20,9 @@ import {
   CircleSlash,
   CalendarClock,
   Mail,
+  FlaskConical,
 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
