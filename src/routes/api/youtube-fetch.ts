@@ -46,6 +46,8 @@ export const Route = createFileRoute("/api/youtube-fetch")({
       },
 
       POST: async ({ request }) => {
+        const gate = await requireActiveUser(request);
+        if (gate instanceof Response) return gate;
         const key = await getSecret("RAPIDAPI_KEY");
         if (!key) {
           return Response.json(
