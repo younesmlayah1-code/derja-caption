@@ -23,6 +23,7 @@ export const Route = createFileRoute("/api/translate-en")({
           : [];
         if (items.length === 0) return Response.json({ items: [] });
 
+        const apiKey: string = key;
         const mode = body.mode === "word" ? "word" : "line";
         const targetLang = body.targetLang === "french" ? "french" : "english";
         const CHUNK = mode === "word" ? 60 : 25;
