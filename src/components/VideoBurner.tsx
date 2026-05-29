@@ -37,7 +37,19 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultSize, setResultSize] = useState<number>(0);
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!busy) return;
+    startRef.current = Date.now();
+    setElapsed(0);
+    const id = window.setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [busy]);
 
   const pickVideo = (f: File) => {
     setError(null);
