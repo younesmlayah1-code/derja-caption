@@ -6,12 +6,7 @@ import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import type { Segment } from "./subtitles";
 import { segmentToWordCues } from "./subtitles";
 
-export type BurnStyleId =
-  | "tiktok"
-  | "youtube"
-  | "karaoke"
-  | "neon"
-  | "minimal";
+export type BurnStyleId = "tiktok" | "youtube" | "karaoke" | "neon" | "minimal";
 
 export type BurnMode = "line" | "word";
 export type BurnScript = "arabic" | "french";
@@ -232,9 +227,7 @@ const LATIN_FONT_URL =
 export const ARABIC_FONT_NAME = "Noto Naskh Arabic";
 export const LATIN_FONT_NAME = "Inter";
 
-export async function loadFFmpeg(
-  onLog?: (msg: string) => void,
-): Promise<FFmpeg> {
+export async function loadFFmpeg(onLog?: (msg: string) => void): Promise<FFmpeg> {
   if (ffmpegInstance) return ffmpegInstance;
   if (loadPromise) return loadPromise;
 
