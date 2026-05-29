@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Shield, LogOut, Trash2, KeyRound, Save, Eraser } from "lucide-react";
+import { Loader2, Shield, LogOut, Trash2, KeyRound, Save, Eraser, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
   adminDeleteUser,
   adminListSecrets,
   adminListUsers,
+  adminResetUserPassword,
   adminUpdateSecret,
   adminUpdateUser,
   ensureAdminBootstrap,
