@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { geminiChat } from "@/lib/gemini.server";
 
 export const Route = createFileRoute("/api/transcribe")({
   server: {
