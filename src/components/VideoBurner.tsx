@@ -69,24 +69,28 @@ export function VideoBurner({ segments, mode, script, sourceFile }: Props) {
 
   const fontName = script === "arabic" ? ARABIC_FONT_NAME : LATIN_FONT_NAME;
 
-  const probeDimensions = useCallback((file: File): Promise<{ w: number; h: number }> => {
-    return new Promise((resolve) => {
-      const v = document.createElement("video");
-      v.preload = "metadata";
-      v.muted = true;
-      v.src = URL.createObjectURL(file);
-      v.onloadedmetadata = () => {
-        const w = v.videoWidth || 1080;
-        const h = v.videoHeight || 1920;
-        URL.revokeObjectURL(v.src);
-        resolve({ w, h });
-      };
-      v.onerror = () => {
-        URL.revokeObjectURL(v.src);
-        resolve({ w: 1080, h: 1920 });
-      };
-    });
-  }, []);
+  const probeMeta = useCallback(
+    (file: File): Promise<{ w: number; h: number; duration: number }> => {
+      return new Promise((resolve) => {
+        const v = document.createElement("video");
+        v.preload = "metadata";
+        v.muted = true;
+        v.src = URL.createObjectURL(file);
+        v.onloadedmetadata = () => {
+          const w = v.videoWidth || 1080;
+          const h = v.videoHeight || 1920;
+          const duration = Number.isFinite(v.duration) ? v.duration : 0;
+          URL.revokeObjectURL(v.src);
+          resolve({ w, h, duration });
+        };
+        v.onerror = () => {
+          URL.revokeObjectURL(v.src);
+          resolve({ w: 1080, h: 1920, duration: 0 });
+        };
+      });
+    },
+    [],
+  );
 
   const run = async () => {
     if (!video) return;
