@@ -244,18 +244,34 @@ function AdminPanel() {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-8">
-      <header className="mb-6 flex items-center justify-between">
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />
           <h1 className="text-2xl font-semibold">Admin panel</h1>
         </div>
-        <button
-          onClick={() => supabase.auth.signOut()}
-          className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-1.5 text-sm hover:bg-accent"
-        >
-          <LogOut className="h-4 w-4" /> Sign out
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/beta"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-primary/50 bg-primary/10 px-3 py-1.5 text-sm text-primary hover:bg-primary/20"
+            title="Open the beta workspace"
+          >
+            <FlaskConical className="h-4 w-4" /> Beta
+          </Link>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-sm hover:bg-accent"
+          >
+            <Home className="h-4 w-4" /> Home
+          </Link>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-sm hover:bg-accent"
+          >
+            <LogOut className="h-4 w-4" /> Sign out
+          </button>
+        </div>
       </header>
+
 
       {isLoading ? (
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
