@@ -67,7 +67,6 @@ async function translateChunk(
   items: Item[],
   mode: "line" | "word",
   targetLang: "english" | "french",
-  key: string,
 ): Promise<Item[]> {
   const langName = targetLang === "french" ? "French" : "English";
   const system =
