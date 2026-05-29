@@ -160,6 +160,10 @@ function AdminPanel() {
     queryKey: ["admin-users"],
     queryFn: () => adminListUsers(),
   });
+  const { data: plans = [] } = useQuery({
+    queryKey: ["admin-plans"],
+    queryFn: () => getPlans(),
+  });
 
   const update = useMutation({
     mutationFn: (vars: {
