@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   Crown,
   Infinity as InfinityIcon,
@@ -9,6 +10,10 @@ import {
   MessageCircle,
   ShieldCheck,
   Loader2,
+  Mail,
+  KeyRound,
+  Save,
+  CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { getMyAccess } from "@/lib/auth.functions";
@@ -26,11 +31,11 @@ export const Route = createFileRoute("/account")({
 });
 
 const PLANS = [
-  { label: "1 Month", duration: "30 days of access" },
-  { label: "3 Months", duration: "90 days of access", badge: "Popular" },
-  { label: "6 Months", duration: "180 days of access" },
-  { label: "12 Months", duration: "365 days of access", badge: "Best value" },
-  { label: "Unlimited", duration: "Lifetime access" },
+  { label: "1 Month", duration: "30 days of access", price: "15 TND" },
+  { label: "3 Months", duration: "90 days of access", price: "40 TND", badge: "Popular" },
+  { label: "6 Months", duration: "180 days of access", price: "70 TND" },
+  { label: "12 Months", duration: "365 days of access", price: "120 TND", badge: "Best value" },
+  { label: "Unlimited", duration: "Lifetime access", price: "250 TND" },
 ];
 
 function AccountPage() {
