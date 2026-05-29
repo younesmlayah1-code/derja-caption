@@ -64,10 +64,10 @@ function AccountPage() {
   const isPro = data?.plan === "pro" && data?.active;
   const unlimited = isPro && !data?.expiresAt;
   const days = daysRemaining(data?.expiresAt ?? null);
-  const buildWaUrl = (planLabel: string) => {
+  const buildWaUrl = (planLabel: string, price: string) => {
     const msg = `Hi! I'd like to ${
       isPro ? "renew/upgrade" : "subscribe"
-    } to the ${planLabel} plan for Derja Caption.\nAccount: ${data?.email ?? ""}`;
+    } to the ${planLabel} plan (${price}) for Derja Caption.\nAccount: ${data?.email ?? ""}`;
     return `https://wa.me/21692799284?text=${encodeURIComponent(msg)}`;
   };
 
