@@ -163,7 +163,7 @@ function numOrNull(v: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-const WORD_EDGE = "[\\s،,.؟!?;:؛()\\[\\]{}\\\"'«»]";
+const WORD_EDGE = "[\\s،,.؟!?;:؛()\\[\\]{}\"'«»]";
 const LOANWORD_FIXES: Array<[string, string]> = [
   ["برودوي|برودوا|برودو|produi(?:t)?", "produit"],
   ["بروجي|بروجاي|projet", "projet"],
