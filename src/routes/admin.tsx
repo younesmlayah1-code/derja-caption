@@ -250,13 +250,6 @@ function AdminPanel() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            to="/beta"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-primary/50 bg-primary/10 px-3 py-1.5 text-sm text-primary hover:bg-primary/20"
-            title="Open the beta workspace"
-          >
-            <FlaskConical className="h-4 w-4" /> Beta
-          </Link>
-          <Link
             to="/"
             className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-sm hover:bg-accent"
           >
