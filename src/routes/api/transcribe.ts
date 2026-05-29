@@ -80,9 +80,6 @@ export const Route = createFileRoute("/api/transcribe")({
           text: ((w.word ?? w.text) || "").trim(),
         })).filter((w) => w.text.length > 0);
 
-        // Assign each word to the segment whose [start,end] contains its
-        // midpoint. Guarantees every word lands in exactly one segment — no
-        // drops on boundaries.
         const segs = (data.segments ?? []).map((s, i) => ({
           id: typeof s.id === "number" ? s.id : i,
           start: s.start,
@@ -94,7 +91,6 @@ export const Route = createFileRoute("/api/transcribe")({
           const mid = (w.start + w.end) / 2;
           let idx = segs.findIndex((s) => mid >= s.start && mid <= s.end);
           if (idx === -1) {
-            // Fallback: nearest segment by distance to midpoint.
             let best = 0;
             let bestDist = Infinity;
             for (let i = 0; i < segs.length; i++) {
@@ -105,14 +101,8 @@ export const Route = createFileRoute("/api/transcribe")({
           }
           if (idx >= 0 && segs[idx]) segs[idx].words.push(w);
         }
-        const rawSegments = segs;
+        const segments = segs.filter((s) => s.text.length > 0);
 
-        // Drop segments that became empty after dedupe.
-        const segments = rawSegments.filter((s) => s.text.length > 0);
-
-        // Polish spelling, spacing, and punctuation with Lovable AI while
-        // preserving the original Derja words and meaning. Failures here are
-        // non-fatal — we fall back to the raw Whisper output.
         const polishedSegments = await polishSegments(segments).catch((e: unknown) => {
           console.error("polishSegments failed:", e);
           return segments;
@@ -121,7 +111,6 @@ export const Route = createFileRoute("/api/transcribe")({
         const fullText = polishedSegments.map((s: { text: string }) => s.text).join(" ").trim()
           || dedupeRepeats((data.text || "").trim());
 
-        // Forward Groq rate-limit headers so the UI can show "minutes left today".
         const h = res.headers;
         const rate = {
           limitAudioSeconds: numOrNull(h.get("x-ratelimit-limit-audio-seconds")),
@@ -143,11 +132,8 @@ function numOrNull(v: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-type PolishSeg = { id: number; start: number; end: number; text: string };
+type PolishSeg = { id: number; start: number; end: number; text: string; words?: Array<{ start: number; end: number; text: string }> };
 
-// Use Lovable AI to fix spelling, spacing and punctuation in Derja segments
-// while preserving the original wording and meaning. Returns same shape with
-// cleaned text. Throws on hard failure; caller falls back to raw segments.
 async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   if (segments.length === 0) return segments;
   const key = await getSecret("LOVABLE_API_KEY");
@@ -191,7 +177,6 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   const content = j.choices?.[0]?.message?.content?.trim() ?? "";
   if (!content) return segments;
 
-  // Model may return either a bare array or an object wrapping it.
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
@@ -222,24 +207,19 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
   });
 }
 
-// Collapse only obvious Whisper hallucination loops. We DO NOT touch a single
-// repeat (e.g. "لا لا", "شوية شوية") because those are valid speech. We only
-// act when something repeats 3+ times in a row — that's the real artifact.
 function dedupeRepeats(input: string): string {
   if (!input) return input;
-  // Collapse runs of the same character (6+) down to 2: "اااااااا" -> "اا".
   let s = input.replace(/(.)\1{5,}/g, "$1$1");
 
   const words = s.split(/\s+/).filter(Boolean);
   if (words.length < 3) return s.trim();
 
-  // Collapse a word repeated 3+ times in a row down to a single instance.
   const out: string[] = [];
   let run = 1;
   for (let i = 0; i < words.length; i++) {
     if (i > 0 && words[i] === words[i - 1]) {
       run++;
-      if (run >= 3) continue; // skip 3rd+ repetition
+      if (run >= 3) continue;
       out.push(words[i]);
     } else {
       run = 1;
@@ -247,7 +227,6 @@ function dedupeRepeats(input: string): string {
     }
   }
 
-  // Collapse n-gram phrases repeated 3+ times (n=2..5).
   for (let n = 2; n <= 5; n++) {
     let i = 0;
     while (i + 3 * n <= out.length) {
@@ -255,7 +234,6 @@ function dedupeRepeats(input: string): string {
       const b = out.slice(i + n, i + 2 * n).join(" ");
       const c = out.slice(i + 2 * n, i + 3 * n).join(" ");
       if (a === b && b === c) {
-        // Drop the 3rd copy, keep checking from same position for more.
         out.splice(i + 2 * n, n);
       } else {
         i++;
