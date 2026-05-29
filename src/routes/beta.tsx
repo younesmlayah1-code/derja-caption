@@ -164,7 +164,10 @@ function BetaApp() {
     }
   };
 
-  // ------- Step 2: transcribe (full video) -------
+  // ------- Step 2: language selection -------
+  const [lang, setLang] = useState<Lang>("derja-ar");
+
+  // ------- Step 3: transcribe (full video) -------
   type Stage = "idle" | "extracting" | "uploading" | "transcribing" | "done" | "error";
   const [stage, setStage] = useState<Stage>("idle");
   const [progressLabel, setProgressLabel] = useState("");
@@ -191,7 +194,7 @@ function BetaApp() {
     }
   }, [file]);
 
-  // ------- Step 3: AI clip suggestion + regenerate + manual -------
+  // ------- Step 4: AI clip suggestion + regenerate + manual -------
   const [clip, setClip] = useState<Clip | null>(null);
   const [clipLoading, setClipLoading] = useState(false);
   const [triedRanges, setTriedRanges] = useState<Array<{ start: number; end: number }>>([]);
@@ -247,7 +250,7 @@ function BetaApp() {
     setClip({ start: s, end: e, title: "Manual clip", reason: "" });
   };
 
-  // ------- Step 3b: clip preview (clamp to range) -------
+  // ------- Step 4b: clip preview (clamp to range) -------
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -288,9 +291,6 @@ function BetaApp() {
       v.pause();
     }
   };
-
-  // ------- Step 4: language selection -------
-  const [lang, setLang] = useState<Lang>("derja-ar");
 
   // Clip-scoped segments (renumbered, relative time)
   const clipSegments = useMemo(() => {
