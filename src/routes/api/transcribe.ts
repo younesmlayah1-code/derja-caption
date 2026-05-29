@@ -79,10 +79,12 @@ export const Route = createFileRoute("/api/transcribe")({
         // of truth, then align it back onto Groq's timestamps. This is far more
         // reliable for Tunisian Derja with French/English code-switching than
         // trying to repair badly-spelled words one-by-one after Whisper.
-        const highAccuracyText = await transcribeHighAccuracyText(file, derjaPrompt).catch((e: unknown) => {
-          console.error("high-accuracy transcription failed, using Groq transcript:", e);
-          return "";
-        });
+        const highAccuracyText = await transcribeHighAccuracyText(file, derjaPrompt).catch(
+          (e: unknown) => {
+            console.error("high-accuracy transcription failed, using Groq transcript:", e);
+            return "";
+          },
+        );
 
         const allWords = (data.words ?? [])
           .map((w) => ({
@@ -330,7 +332,6 @@ const LOANWORD_FIXES: Array<[string, string]> = [
   ["لوغين|login", "login"],
 ];
 
-
 function normalizeLoanwords(input: string): string {
   let out = input;
   for (const [pattern, replacement] of LOANWORD_FIXES) {
@@ -392,7 +393,10 @@ async function transcribeHighAccuracyText(file: File, prompt: string): Promise<s
       const text = normalizeTranscript(json.text ?? "");
       if (text) return text;
     } else {
-      console.error(`OpenAI transcription failed (${res.status}):`, (await res.text()).slice(0, 500));
+      console.error(
+        `OpenAI transcription failed (${res.status}):`,
+        (await res.text()).slice(0, 500),
+      );
     }
   }
 
@@ -420,18 +424,33 @@ async function transcribeHighAccuracyText(file: File, prompt: string): Promise<s
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(geminiKey)}`,
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
   );
-  if (!res.ok) throw new Error(`Gemini audio transcription failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
-  const json = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  return normalizeTranscript(json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join(" ") ?? "");
+  if (!res.ok)
+    throw new Error(
+      `Gemini audio transcription failed (${res.status}): ${(await res.text()).slice(0, 300)}`,
+    );
+  const json = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  return normalizeTranscript(
+    json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join(" ") ?? "",
+  );
 }
 
 function normalizeTranscript(input: string): string {
   return normalizeLoanwords(dedupeRepeats(input.replace(/^```(?:text)?|```$/g, "").trim()));
 }
 
-async function alignSegmentsToReference(segments: PolishSeg[], referenceText: string): Promise<PolishSeg[]> {
+async function alignSegmentsToReference(
+  segments: PolishSeg[],
+  referenceText: string,
+): Promise<PolishSeg[]> {
   if (segments.length === 0 || !referenceText.trim()) return segments;
-  const payload = segments.map((s) => ({ id: s.id, start: s.start, end: s.end, roughText: s.text }));
+  const payload = segments.map((s) => ({
+    id: s.id,
+    start: s.start,
+    end: s.end,
+    roughText: s.text,
+  }));
   const content = await geminiChat({
     model: "gemini-2.5-flash",
     jsonMode: true,
@@ -446,7 +465,8 @@ async function alignSegmentsToReference(segments: PolishSeg[], referenceText: st
   if (!parsed.length) return splitReferenceBySegmentWeights(segments, referenceText);
   const byId = new Map<number, string>();
   for (const item of parsed) {
-    if (typeof item.id === "number" && typeof item.text === "string") byId.set(item.id, normalizeTranscript(item.text));
+    if (typeof item.id === "number" && typeof item.text === "string")
+      byId.set(item.id, normalizeTranscript(item.text));
   }
   return segments.map((s) => ({ ...s, text: byId.get(s.id) || s.text }));
 }
@@ -460,8 +480,14 @@ function splitReferenceBySegmentWeights(segments: PolishSeg[], referenceText: st
   return segments.map((s, i) => {
     const remainingSegments = segments.length - i;
     const remainingTokens = tokens.length - cursor;
-    const wanted = i === segments.length - 1 ? remainingTokens : Math.max(1, Math.round((tokens.length * weights[i]) / total));
-    const count = Math.min(Math.max(1, wanted), Math.max(1, remainingTokens - remainingSegments + 1));
+    const wanted =
+      i === segments.length - 1
+        ? remainingTokens
+        : Math.max(1, Math.round((tokens.length * weights[i]) / total));
+    const count = Math.min(
+      Math.max(1, wanted),
+      Math.max(1, remainingTokens - remainingSegments + 1),
+    );
     const text = tokens.slice(cursor, cursor + count).join(" ");
     cursor += count;
     return { ...s, text: text || s.text };
@@ -473,7 +499,8 @@ function parseJsonArray(content: string): Array<{ id?: number; text?: string }> 
     const parsed = JSON.parse(content) as unknown;
     if (Array.isArray(parsed)) return parsed as Array<{ id?: number; text?: string }>;
     const wrapped = parsed as { segments?: unknown };
-    if (Array.isArray(wrapped.segments)) return wrapped.segments as Array<{ id?: number; text?: string }>;
+    if (Array.isArray(wrapped.segments))
+      return wrapped.segments as Array<{ id?: number; text?: string }>;
   } catch {
     const match = content.match(/\[[\s\S]*\]/);
     if (match) return parseJsonArray(match[0]);
@@ -565,7 +592,6 @@ async function polishSegments(segments: PolishSeg[]): Promise<PolishSeg[]> {
     if (lastErr) console.error("polishSegments: all models failed:", lastErr);
     return segments;
   }
-
 
   // Model may return either a bare array or an object wrapping it.
   let parsed: unknown;
