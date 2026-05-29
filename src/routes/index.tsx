@@ -535,8 +535,7 @@ function Home() {
             Extractor
           </h1>
           <p className="mx-auto mt-4 max-w-md text-sm text-muted-foreground md:text-base">
-            Upload a video or paste a YouTube link. Get Derja or English captions, line- or
-            word-level, and let AI pick the best 2–4 min short.
+            Upload a video. Get Derja or English captions, line- or word-level.
           </p>
         </header>
 
