@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { transliterateDerja } from "@/lib/subtitles";
 import { getSecret } from "@/lib/secrets.server";
 import { requireActiveUser } from "@/lib/access.server";
+import { geminiChat } from "@/lib/gemini.server";
 
 
 type Item = { id: number | string; text: string };
