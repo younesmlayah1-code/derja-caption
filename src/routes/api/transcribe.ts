@@ -75,17 +75,6 @@ export const Route = createFileRoute("/api/transcribe")({
           words?: Array<{ word?: string; text?: string; start: number; end: number }>;
         };
 
-        // Second-pass ASR: use a stronger transcript-only model as the source
-        // of truth, then align it back onto Groq's timestamps. This is far more
-        // reliable for Tunisian Derja with French/English code-switching than
-        // trying to repair badly-spelled words one-by-one after Whisper.
-        const highAccuracyText = await transcribeHighAccuracyText(file, derjaPrompt).catch(
-          (e: unknown) => {
-            console.error("high-accuracy transcription failed, using Groq transcript:", e);
-            return "";
-          },
-        );
-
         const allWords = (data.words ?? [])
           .map((w) => ({
             start: w.start,
@@ -127,23 +116,14 @@ export const Route = createFileRoute("/api/transcribe")({
         // Drop segments that became empty after dedupe.
         const segments = rawSegments.filter((s) => s.text.length > 0);
 
-        const referenceSegments: PolishSeg[] = highAccuracyText
-          ? await alignSegmentsToReference(segments, highAccuracyText).catch((e: unknown) => {
-              console.error("alignSegmentsToReference failed, using weighted split:", e);
-              return splitReferenceBySegmentWeights(segments, highAccuracyText);
-            })
-          : segments;
-
         // Polish spelling, spacing, and punctuation with the configured AI while
         // preserving the original Derja words and meaning. Failures here are
         // non-fatal — we fall back to the raw Whisper output.
         const polishedSegments: PolishSeg[] = (
-          highAccuracyText
-            ? referenceSegments
-            : await polishSegments(referenceSegments).catch((e: unknown) => {
-                console.error("polishSegments failed:", e);
-                return referenceSegments;
-              })
+          await polishSegments(segments).catch((e: unknown) => {
+            console.error("polishSegments failed:", e);
+            return segments;
+          })
         ).map(syncWordsToSegmentText);
 
         const fullText =
