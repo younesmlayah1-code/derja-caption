@@ -27,6 +27,7 @@ import {
   type Segment,
 } from "@/lib/subtitles";
 import { transcribeFile, type RateInfo } from "@/lib/transcribe";
+import { AccessGate } from "@/components/AccessGate";
 
 type Script = "arabic" | "french" | "english";
 
@@ -77,18 +78,6 @@ function HomeGated() {
     </AccessGate>
   );
 }
-  head: () => ({
-    meta: [
-      { title: "Derja Subtitle Extractor — Tunisian Arabic captions from video" },
-      {
-        name: "description",
-        content:
-          "Upload a video and extract Tunisian Arabic (Derja) subtitles with English translation, line- or word-level.",
-      },
-    ],
-  }),
-  component: Home,
-});
 
 const ACCEPTED = [
   "video/mp4",
